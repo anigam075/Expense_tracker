@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import tempfile
+import traceback
 from datetime import date
 from pathlib import Path
 
@@ -7,6 +9,7 @@ from kivy.app import App
 from kivy.lang import Builder
 from kivy.properties import ListProperty, ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
 
 from app.database import ExpenseRepository
 from app.models import ExpenseRecord
@@ -222,7 +225,36 @@ class ExpenseForm(BoxLayout):
 class ExpenseTrackerApp(App):
     title = "Expense Tracker"
 
-    def build(self) -> ExpenseForm:
-        Builder.load_string(KV)
-        repository = ExpenseRepository(Path(self.user_data_dir) / "expenses.db")
-        return ExpenseForm(repository=repository)
+    def build(self) -> ExpenseForm | Label:
+        try:
+            Builder.load_string(KV)
+            repository = ExpenseRepository(Path(self.user_data_dir) / "expenses.db")
+            return ExpenseForm(repository=repository)
+        except Exception:
+            error_text = traceback.format_exc()
+            crash_path = self._write_crash_log(error_text)
+            message = (
+                "Startup failed.\n\n"
+                f"Crash log: {crash_path}\n\n"
+                f"{error_text}"
+            )
+            return Label(text=message, halign="left", valign="top", text_size=(0, 0))
+
+    def _write_crash_log(self, error_text: str) -> str:
+        candidates: list[Path] = []
+        user_dir = getattr(self, "user_data_dir", "")
+        if user_dir:
+            candidates.append(Path(user_dir))
+        candidates.append(Path(tempfile.gettempdir()))
+        candidates.append(Path.cwd())
+
+        for directory in candidates:
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+                log_path = directory / "expense_tracker_crash.log"
+                log_path.write_text(error_text, encoding="utf-8")
+                return str(log_path)
+            except OSError:
+                continue
+
+        return "unable to write crash log"
