@@ -10,3 +10,4 @@ Minimal Kivy baseline for manual expense entry.
 ```
 
 The app stores manual entries in `data/expenses.db`.
+On Android, it stores them in the app's private `user_data_dir`.

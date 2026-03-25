@@ -224,5 +224,5 @@ class ExpenseTrackerApp(App):
 
     def build(self) -> ExpenseForm:
         Builder.load_string(KV)
-        repository = ExpenseRepository(Path("data") / "expenses.db")
+        repository = ExpenseRepository(Path(self.user_data_dir) / "expenses.db")
         return ExpenseForm(repository=repository)
