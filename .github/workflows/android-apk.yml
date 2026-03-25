@@ -33,7 +33,9 @@ jobs:
             zip \
             unzip \
             autoconf \
+            automake \
             libtool \
+            libtool-bin \
             pkg-config \
             zlib1g-dev \
             libncurses5-dev \
@@ -48,7 +50,7 @@ jobs:
           pip install Cython==0.29.33 buildozer
 
       - name: Build debug APK
-        run: buildozer android debug
+        run: buildozer -v android debug
 
       - name: Locate APK
         id: apk
