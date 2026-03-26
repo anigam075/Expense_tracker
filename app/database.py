@@ -67,7 +67,68 @@ class ExpenseRepository:
             source=expense.source,
         )
 
-    def list_recent_expenses(self, limit: int = 10) -> list[ExpenseRecord]:
+    def update_expense(self, expense: ExpenseRecord) -> ExpenseRecord:
+        if expense.id is None:
+            raise ValueError("Expense id is required for updates.")
+
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE expenses
+                SET amount = ?,
+                    merchant = ?,
+                    payment_method = ?,
+                    expense_date = ?,
+                    notes = ?,
+                    source = ?
+                WHERE id = ?
+                """,
+                (
+                    expense.amount,
+                    expense.merchant,
+                    expense.payment_method,
+                    expense.expense_date,
+                    expense.notes,
+                    expense.source,
+                    expense.id,
+                ),
+            )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"Expense with id {expense.id} was not found.")
+
+        return expense
+
+    def get_expense(self, expense_id: int) -> ExpenseRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id, amount, merchant, payment_method, expense_date, notes, source
+                FROM expenses
+                WHERE id = ?
+                """,
+                (expense_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return self._row_to_record(row)
+
+    def delete_expense(self, expense_id: int) -> None:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM expenses
+                WHERE id = ?
+                """,
+                (expense_id,),
+            )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"Expense with id {expense_id} was not found.")
+
+    def list_expenses(self, limit: int = 100) -> list[ExpenseRecord]:
         with self._connect() as connection:
             rows = connection.execute(
                 """
@@ -79,15 +140,18 @@ class ExpenseRepository:
                 (limit,),
             ).fetchall()
 
-        return [
-            ExpenseRecord(
-                id=row["id"],
-                amount=row["amount"],
-                merchant=row["merchant"],
-                payment_method=row["payment_method"],
-                expense_date=row["expense_date"],
-                notes=row["notes"],
-                source=row["source"],
-            )
-            for row in rows
-        ]
+        return [self._row_to_record(row) for row in rows]
+
+    def list_recent_expenses(self, limit: int = 10) -> list[ExpenseRecord]:
+        return self.list_expenses(limit=limit)
+
+    def _row_to_record(self, row: sqlite3.Row) -> ExpenseRecord:
+        return ExpenseRecord(
+            id=row["id"],
+            amount=row["amount"],
+            merchant=row["merchant"],
+            payment_method=row["payment_method"],
+            expense_date=row["expense_date"],
+            notes=row["notes"],
+            source=row["source"],
+        )

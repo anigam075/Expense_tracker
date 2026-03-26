@@ -7,152 +7,309 @@ from pathlib import Path
 
 from kivy.app import App
 from kivy.lang import Builder
-from kivy.properties import ListProperty, ObjectProperty, StringProperty
+from kivy.properties import ListProperty, NumericProperty, ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
+from kivy.uix.screenmanager import Screen, ScreenManager
 
 from app.database import ExpenseRepository
 from app.models import ExpenseRecord
 
 KV = """
-<ExpenseForm>:
+<ExpenseRow>:
+    size_hint_y: None
+    height: "92dp"
+    padding: "10dp"
+    spacing: "10dp"
     orientation: "vertical"
-    spacing: "12dp"
-    padding: "16dp"
     canvas.before:
         Color:
-            rgba: 0.96, 0.94, 0.9, 1
-        Rectangle:
+            rgba: 1, 1, 1, 1
+        RoundedRectangle:
             pos: self.pos
             size: self.size
-
-    Label:
-        text: "Expense Tracker"
-        size_hint_y: None
-        height: "40dp"
-        font_size: "26sp"
-        bold: True
-        color: 0.14, 0.18, 0.16, 1
-
-    Label:
-        text: root.feedback_message
-        size_hint_y: None
-        height: "24dp"
-        color: root.feedback_color
-
-    GridLayout:
-        cols: 2
-        size_hint_y: None
-        height: self.minimum_height
-        row_default_height: "46dp"
-        row_force_default: True
-        spacing: "10dp"
-
-        Label:
-            text: "Amount"
-            halign: "left"
-            text_size: self.size
-            color: 0.14, 0.18, 0.16, 1
-        TextInput:
-            id: amount_input
-            multiline: False
-            hint_text: "e.g. 245.50"
-            input_filter: "float"
-
-        Label:
-            text: "Merchant"
-            halign: "left"
-            text_size: self.size
-            color: 0.14, 0.18, 0.16, 1
-        TextInput:
-            id: merchant_input
-            multiline: False
-            hint_text: "Where did you spend?"
-
-        Label:
-            text: "Payment Method"
-            halign: "left"
-            text_size: self.size
-            color: 0.14, 0.18, 0.16, 1
-        Spinner:
-            id: payment_method_input
-            text: "UPI"
-            values: ["UPI", "Card", "Cash", "Net Banking", "Wallet", "Other"]
-
-        Label:
-            text: "Date"
-            halign: "left"
-            text_size: self.size
-            color: 0.14, 0.18, 0.16, 1
-        TextInput:
-            id: date_input
-            multiline: False
-            hint_text: "YYYY-MM-DD"
-            text: root.default_date
-
-        Label:
-            text: "Notes"
-            halign: "left"
-            text_size: self.size
-            valign: "top"
-            color: 0.14, 0.18, 0.16, 1
-        TextInput:
-            id: notes_input
-            hint_text: "Optional details"
+            radius: [16, 16, 16, 16]
 
     Button:
-        text: "Save Expense"
-        size_hint_y: None
-        height: "48dp"
+        text: root.summary_text
+        halign: "left"
+        valign: "middle"
+        text_size: self.width - 24, self.height - 16
         background_normal: ""
-        background_color: 0.18, 0.5, 0.32, 1
-        on_release: root.save_expense()
+        background_down: ""
+        background_color: 0, 0, 0, 0
+        color: 0.15, 0.18, 0.16, 1
+        on_release: root.on_open()
 
-    Label:
-        text: "Recent Expenses"
-        size_hint_y: None
-        height: "32dp"
-        font_size: "20sp"
-        bold: True
-        color: 0.14, 0.18, 0.16, 1
+<ExpenseListScreen>:
+    name: "list"
+    BoxLayout:
+        orientation: "vertical"
+        spacing: "12dp"
+        padding: "16dp"
+        canvas.before:
+            Color:
+                rgba: 0.96, 0.94, 0.9, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
 
-    ScrollView:
-        do_scroll_x: False
+        Label:
+            text: "Expenses"
+            size_hint_y: None
+            height: "40dp"
+            font_size: "28sp"
+            bold: True
+            color: 0.14, 0.18, 0.16, 1
+
+        Label:
+            text: root.status_message
+            size_hint_y: None
+            height: "24dp"
+            color: root.status_color
+
+        Button:
+            text: "Add Expense"
+            size_hint_y: None
+            height: "48dp"
+            background_normal: ""
+            background_color: 0.18, 0.5, 0.32, 1
+            on_release: root.add_expense()
+
+        ScrollView:
+            do_scroll_x: False
+
+            BoxLayout:
+                id: list_container
+                orientation: "vertical"
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: "10dp"
+                padding: 0, 0, 0, "12dp"
+
+<ExpenseEditScreen>:
+    name: "edit"
+    BoxLayout:
+        orientation: "vertical"
+        spacing: "12dp"
+        padding: "16dp"
+        canvas.before:
+            Color:
+                rgba: 0.96, 0.94, 0.9, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        Label:
+            text: root.screen_title
+            size_hint_y: None
+            height: "40dp"
+            font_size: "28sp"
+            bold: True
+            color: 0.14, 0.18, 0.16, 1
+
+        Label:
+            text: root.feedback_message
+            size_hint_y: None
+            height: "24dp"
+            color: root.feedback_color
 
         GridLayout:
-            cols: 1
+            cols: 2
             size_hint_y: None
             height: self.minimum_height
-            spacing: "8dp"
-            padding: 0, 0, 0, "12dp"
-
-            canvas.before:
-                Color:
-                    rgba: 1, 1, 1, 0
-                Rectangle:
-                    pos: self.pos
-                    size: self.size
+            row_default_height: "48dp"
+            row_force_default: True
+            spacing: "10dp"
 
             Label:
-                size_hint_y: None
-                height: self.texture_size[1] if self.texture_size[1] > 0 else "24dp"
-                text_size: self.width, None
+                text: "Amount"
                 halign: "left"
+                text_size: self.size
+                color: 0.14, 0.18, 0.16, 1
+            TextInput:
+                id: amount_input
+                multiline: False
+                hint_text: "e.g. 245.50"
+                input_filter: "float"
+
+            Label:
+                text: "Merchant"
+                halign: "left"
+                text_size: self.size
+                color: 0.14, 0.18, 0.16, 1
+            TextInput:
+                id: merchant_input
+                multiline: False
+                hint_text: "Where did you spend?"
+
+            Label:
+                text: "Payment Method"
+                halign: "left"
+                text_size: self.size
+                color: 0.14, 0.18, 0.16, 1
+            Spinner:
+                id: payment_method_input
+                text: "UPI"
+                values: ["UPI", "Card", "Cash", "Net Banking", "Wallet", "Other"]
+
+            Label:
+                text: "Date"
+                halign: "left"
+                text_size: self.size
+                color: 0.14, 0.18, 0.16, 1
+            TextInput:
+                id: date_input
+                multiline: False
+                hint_text: "YYYY-MM-DD"
+
+            Label:
+                text: "Notes"
+                halign: "left"
+                text_size: self.size
                 valign: "top"
-                color: 0.22, 0.25, 0.24, 1
-                text: root.recent_expenses_text
+                color: 0.14, 0.18, 0.16, 1
+            TextInput:
+                id: notes_input
+                hint_text: "Optional details"
+
+        BoxLayout:
+            size_hint_y: None
+            height: "48dp"
+            spacing: "10dp"
+
+            Button:
+                text: "Delete"
+                opacity: 1 if root.show_delete_button else 0
+                disabled: not root.show_delete_button
+                background_normal: ""
+                background_color: 0.68, 0.24, 0.2, 1
+                on_release: root.delete_expense()
+
+            Button:
+                text: "Cancel"
+                background_normal: ""
+                background_color: 0.4, 0.45, 0.43, 1
+                on_release: root.cancel()
+
+            Button:
+                text: root.action_button_text
+                background_normal: ""
+                background_color: 0.18, 0.5, 0.32, 1
+                on_release: root.save_expense()
+
+<ExpenseRoot>:
 """
 
 
-class ExpenseForm(BoxLayout):
+class ExpenseRow(BoxLayout):
+    expense_id = NumericProperty(0)
+    summary_text = StringProperty("")
+    on_open = ObjectProperty(lambda: None)
+
+
+class ExpenseListScreen(Screen):
     repository = ObjectProperty(allownone=False)
-    feedback_message = StringProperty("Fill in the details and save the expense.")
-    recent_expenses_text = StringProperty("No expenses saved yet.")
+    status_message = StringProperty("Review saved expenses or add a new one.")
+    status_color = ListProperty([0.13, 0.42, 0.23, 1])
+
+    def on_pre_enter(self, *args) -> None:
+        self.refresh_expenses()
+        return super().on_pre_enter(*args)
+
+    def refresh_expenses(self) -> None:
+        container = self.ids.list_container
+        container.clear_widgets()
+        expenses = self.repository.list_expenses()
+
+        if not expenses:
+            container.add_widget(
+                Label(
+                    text="No expenses saved yet.",
+                    size_hint_y=None,
+                    height=40,
+                    color=(0.22, 0.25, 0.24, 1),
+                )
+            )
+            return
+
+        for expense in expenses:
+            notes_line = f"\\n{expense.notes}" if expense.notes else ""
+            summary = (
+                f"{expense.expense_date}  |  Rs. {expense.amount:.2f}\\n"
+                f"{expense.merchant} via {expense.payment_method}{notes_line}"
+            )
+            container.add_widget(
+                ExpenseRow(
+                    expense_id=expense.id or 0,
+                    summary_text=summary,
+                    on_open=lambda expense_id=expense.id: self.edit_expense(expense_id),
+                )
+            )
+
+    def add_expense(self) -> None:
+        edit_screen = self.manager.get_screen("edit")
+        edit_screen.prepare_for_new()
+        self.manager.current = "edit"
+
+    def edit_expense(self, expense_id: int | None) -> None:
+        if expense_id is None:
+            self._set_status("Unable to open this expense.", is_error=True)
+            return
+
+        edit_screen = self.manager.get_screen("edit")
+        edit_screen.load_expense(expense_id)
+        self.manager.current = "edit"
+
+    def show_saved_status(self, message: str) -> None:
+        self._set_status(message, is_error=False)
+
+    def _set_status(self, message: str, *, is_error: bool) -> None:
+        self.status_message = message
+        self.status_color = [0.78, 0.24, 0.18, 1] if is_error else [0.13, 0.42, 0.23, 1]
+
+
+class ExpenseEditScreen(Screen):
+    repository = ObjectProperty(allownone=False)
+    expense_id = ObjectProperty(allownone=True)
     default_date = StringProperty(date.today().isoformat())
+    screen_title = StringProperty("Add Expense")
+    action_button_text = StringProperty("Save Expense")
+    show_delete_button = ObjectProperty(False)
+    feedback_message = StringProperty("Fill in the details and save the expense.")
     feedback_color = ListProperty([0.13, 0.42, 0.23, 1])
 
-    def on_kv_post(self, _base_widget) -> None:
-        self.refresh_recent_expenses()
+    def prepare_for_new(self) -> None:
+        self.expense_id = None
+        self.screen_title = "Add Expense"
+        self.action_button_text = "Save Expense"
+        self.show_delete_button = False
+        self._set_feedback("Fill in the details and save the expense.", is_error=False)
+        self._fill_form(
+            ExpenseRecord(
+                id=None,
+                amount=0.0,
+                merchant="",
+                payment_method="UPI",
+                expense_date=self.default_date,
+                notes="",
+            )
+        )
+        self.ids.amount_input.text = ""
+
+    def load_expense(self, expense_id: int) -> None:
+        expense = self.repository.get_expense(expense_id)
+        if expense is None:
+            self.prepare_for_new()
+            self._set_feedback("Expense not found.", is_error=True)
+            return
+
+        self.expense_id = expense.id
+        self.screen_title = "Edit Expense"
+        self.action_button_text = "Update Expense"
+        self.show_delete_button = True
+        self._set_feedback("Update the details and save the expense.", is_error=False)
+        self._fill_form(expense)
 
     def save_expense(self) -> None:
         amount_text = self.ids.amount_input.text.strip()
@@ -182,54 +339,76 @@ class ExpenseForm(BoxLayout):
             return
 
         expense = ExpenseRecord(
-            id=None,
+            id=self.expense_id,
             amount=amount,
             merchant=merchant,
             payment_method=payment_method,
             expense_date=expense_date,
             notes=notes,
         )
-        saved_expense = self.repository.add_expense(expense)
-        self._set_feedback(
-            f"Saved Rs. {saved_expense.amount:.2f} for {saved_expense.merchant}.",
-            is_error=False,
-        )
-        self._clear_inputs()
-        self.refresh_recent_expenses()
 
-    def refresh_recent_expenses(self) -> None:
-        expenses = self.repository.list_recent_expenses()
-        if not expenses:
-            self.recent_expenses_text = "No expenses saved yet."
+        if self.expense_id is None:
+            saved_expense = self.repository.add_expense(expense)
+            status_message = f"Saved Rs. {saved_expense.amount:.2f} for {saved_expense.merchant}."
+        else:
+            saved_expense = self.repository.update_expense(expense)
+            status_message = f"Updated Rs. {saved_expense.amount:.2f} for {saved_expense.merchant}."
+
+        list_screen = self.manager.get_screen("list")
+        list_screen.show_saved_status(status_message)
+        list_screen.refresh_expenses()
+        self.manager.current = "list"
+
+    def delete_expense(self) -> None:
+        if self.expense_id is None:
+            self._set_feedback("Only saved expenses can be deleted.", is_error=True)
             return
 
-        self.recent_expenses_text = "\n\n".join(
-            f"{expense.expense_date}  |  Rs. {expense.amount:.2f}\n"
-            f"{expense.merchant} via {expense.payment_method}"
-            + (f"\n{expense.notes}" if expense.notes else "")
-            for expense in expenses
-        )
+        expense = self.repository.get_expense(self.expense_id)
+        if expense is None:
+            self._set_feedback("Expense not found.", is_error=True)
+            return
 
-    def _clear_inputs(self) -> None:
-        self.ids.amount_input.text = ""
-        self.ids.merchant_input.text = ""
-        self.ids.payment_method_input.text = "UPI"
-        self.ids.date_input.text = self.default_date
-        self.ids.notes_input.text = ""
+        self.repository.delete_expense(self.expense_id)
+        list_screen = self.manager.get_screen("list")
+        list_screen.show_saved_status(
+            f"Deleted Rs. {expense.amount:.2f} for {expense.merchant}."
+        )
+        list_screen.refresh_expenses()
+        self.prepare_for_new()
+        self.manager.current = "list"
+
+    def cancel(self) -> None:
+        self.manager.current = "list"
+
+    def _fill_form(self, expense: ExpenseRecord) -> None:
+        self.ids.amount_input.text = f"{expense.amount:.2f}" if expense.amount else ""
+        self.ids.merchant_input.text = expense.merchant
+        self.ids.payment_method_input.text = expense.payment_method or "UPI"
+        self.ids.date_input.text = expense.expense_date or self.default_date
+        self.ids.notes_input.text = expense.notes
 
     def _set_feedback(self, message: str, *, is_error: bool) -> None:
         self.feedback_message = message
         self.feedback_color = [0.78, 0.24, 0.18, 1] if is_error else [0.13, 0.42, 0.23, 1]
 
 
+class ExpenseRoot(ScreenManager):
+    repository = ObjectProperty(allownone=False)
+
+
 class ExpenseTrackerApp(App):
     title = "Expense Tracker"
 
-    def build(self) -> ExpenseForm | Label:
+    def build(self) -> ExpenseRoot | Label:
         try:
             Builder.load_string(KV)
             repository = ExpenseRepository(Path(self.user_data_dir) / "expenses.db")
-            return ExpenseForm(repository=repository)
+            root = ExpenseRoot(repository=repository)
+            root.add_widget(ExpenseListScreen(repository=repository))
+            root.add_widget(ExpenseEditScreen(repository=repository))
+            root.current = "list"
+            return root
         except Exception:
             error_text = traceback.format_exc()
             crash_path = self._write_crash_log(error_text)
