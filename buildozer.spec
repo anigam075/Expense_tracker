@@ -14,7 +14,7 @@ source.exclude_dirs = env,.venv,venv,.git,__pycache__,bin,.buildozer,.github
 version = 0.1
 
 # Dependencies
-requirements = python3,kivy==2.3.1
+requirements = python3,kivy==2.3.1,filetype
 
 # Orientation and UI
 orientation = portrait
