@@ -6,8 +6,8 @@ from datetime import date
 from pathlib import Path
 
 from kivy.app import App
-from kivy.lang import Builder
 from kivy.core.window import Window
+from kivy.lang import Builder
 from kivy.properties import ListProperty, NumericProperty, ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -35,16 +35,16 @@ KV = """
 
     Label:
         text: root.summary_text
-        size_hint_x: 0.86
+        size_hint_x: 0.84
         halign: "left"
         valign: "middle"
         text_size: self.width - 8, self.height - 8
         color: 0.15, 0.18, 0.16, 1
 
     Button:
-        text: "⋮"
-        size_hint_x: 0.14
-        font_size: "26sp"
+        text: "..."
+        size_hint_x: 0.16
+        font_size: "20sp"
         bold: True
         background_normal: ""
         background_down: ""
@@ -100,122 +100,157 @@ KV = """
 
 <ExpenseEditScreen>:
     name: "edit"
-    ScrollView:
-        do_scroll_x: False
-        scroll_type: ['bars', 'content']
+    BoxLayout:
+        orientation: "vertical"
+        canvas.before:
+            Color:
+                rgba: 0.96, 0.94, 0.9, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
 
-        BoxLayout:
-            size_hint_y: None
-            height: self.minimum_height
-            orientation: "vertical"
-            spacing: "12dp"
-            padding: "16dp"
-            canvas.before:
-                Color:
-                    rgba: 0.96, 0.94, 0.9, 1
-                Rectangle:
-                    pos: self.pos
-                    size: self.size
-
-            Widget:
-                size_hint_y: None
-                height: "6dp"
-
-            Label:
-                text: root.screen_title
-                size_hint_y: None
-                height: "40dp"
-                font_size: "28sp"
-                bold: True
-                color: 0.14, 0.18, 0.16, 1
-
-            Label:
-                text: root.feedback_message
-                size_hint_y: None
-                height: "24dp"
-                color: root.feedback_color
-
-            GridLayout:
-                cols: 2
-                size_hint_y: None
-                height: self.minimum_height
-                row_default_height: "48dp"
-                row_force_default: True
-                spacing: "10dp"
-
-                Label:
-                    text: "Amount"
-                    halign: "left"
-                    text_size: self.size
-                    color: 0.14, 0.18, 0.16, 1
-                TextInput:
-                    id: amount_input
-                    multiline: False
-                    hint_text: "e.g. 245.50"
-                    input_filter: "float"
-
-                Label:
-                    text: "Merchant"
-                    halign: "left"
-                    text_size: self.size
-                    color: 0.14, 0.18, 0.16, 1
-                TextInput:
-                    id: merchant_input
-                    multiline: False
-                    hint_text: "Where did you spend?"
-
-                Label:
-                    text: "Payment Method"
-                    halign: "left"
-                    text_size: self.size
-                    color: 0.14, 0.18, 0.16, 1
-                Spinner:
-                    id: payment_method_input
-                    text: "UPI"
-                    values: ["UPI", "Card", "Cash", "Net Banking", "Wallet", "Other"]
-
-                Label:
-                    text: "Date"
-                    halign: "left"
-                    text_size: self.size
-                    color: 0.14, 0.18, 0.16, 1
-                TextInput:
-                    id: date_input
-                    multiline: False
-                    hint_text: "YYYY-MM-DD"
-
-                Label:
-                    text: "Notes"
-                    halign: "left"
-                    text_size: self.size
-                    valign: "top"
-                    color: 0.14, 0.18, 0.16, 1
-                TextInput:
-                    id: notes_input
-                    hint_text: "Optional details"
-                    size_hint_y: None
-                    height: "120dp"
+        ScrollView:
+            do_scroll_x: False
+            scroll_type: ['bars', 'content']
 
             BoxLayout:
                 size_hint_y: None
-                height: "48dp"
-                spacing: "10dp"
+                height: max(self.minimum_height, root.height)
+                orientation: "vertical"
+                spacing: "12dp"
+                padding: "16dp"
 
-                Button:
-                    text: "Cancel"
-                    background_normal: ""
-                    background_color: 0.4, 0.45, 0.43, 1
-                    on_release: root.cancel()
+                Widget:
+                    size_hint_y: None
+                    height: "6dp"
 
-                Button:
-                    text: root.action_button_text
-                    background_normal: ""
-                    background_color: 0.18, 0.5, 0.32, 1
-                    on_release: root.save_expense()
+                Label:
+                    text: root.screen_title
+                    size_hint_y: None
+                    height: "40dp"
+                    font_size: "28sp"
+                    bold: True
+                    color: 0.14, 0.18, 0.16, 1
 
-            Widget:
-                size_hint_y: None
-                height: "120dp"
+                Label:
+                    text: root.feedback_message
+                    size_hint_y: None
+                    height: "24dp"
+                    color: root.feedback_color
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: "48dp"
+                    spacing: "10dp"
+
+                    Label:
+                        text: "Amount"
+                        size_hint_x: 0.38
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.size
+                        color: 0.14, 0.18, 0.16, 1
+                    TextInput:
+                        id: amount_input
+                        size_hint_x: 0.62
+                        multiline: False
+                        hint_text: "e.g. 245.50"
+                        input_filter: "float"
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: "48dp"
+                    spacing: "10dp"
+
+                    Label:
+                        text: "Merchant"
+                        size_hint_x: 0.38
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.size
+                        color: 0.14, 0.18, 0.16, 1
+                    TextInput:
+                        id: merchant_input
+                        size_hint_x: 0.62
+                        multiline: False
+                        hint_text: "Where did you spend?"
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: "48dp"
+                    spacing: "10dp"
+
+                    Label:
+                        text: "Payment Method"
+                        size_hint_x: 0.38
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.size
+                        color: 0.14, 0.18, 0.16, 1
+                    Spinner:
+                        id: payment_method_input
+                        size_hint_x: 0.62
+                        text: "UPI"
+                        values: ["UPI", "Card", "Cash", "Net Banking", "Wallet", "Other"]
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: "48dp"
+                    spacing: "10dp"
+
+                    Label:
+                        text: "Date"
+                        size_hint_x: 0.38
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.size
+                        color: 0.14, 0.18, 0.16, 1
+                    TextInput:
+                        id: date_input
+                        size_hint_x: 0.62
+                        multiline: False
+                        hint_text: "YYYY-MM-DD"
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: "120dp"
+                    spacing: "10dp"
+
+                    Label:
+                        text: "Notes"
+                        size_hint_x: 0.38
+                        halign: "left"
+                        valign: "top"
+                        text_size: self.size
+                        color: 0.14, 0.18, 0.16, 1
+                    TextInput:
+                        id: notes_input
+                        size_hint_x: 0.62
+                        hint_text: "Optional details"
+
+                Widget:
+                    size_hint_y: 1
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: "48dp"
+                    spacing: "10dp"
+
+                    Button:
+                        text: "Cancel"
+                        background_normal: ""
+                        background_color: 0.4, 0.45, 0.43, 1
+                        on_release: root.cancel()
+
+                    Button:
+                        text: root.action_button_text
+                        background_normal: ""
+                        background_color: 0.18, 0.5, 0.32, 1
+                        on_release: root.save_expense()
+
+                Widget:
+                    size_hint_y: None
+                    height: "24dp"
 
 <ExpenseRoot>:
 """
@@ -226,7 +261,7 @@ class ExpenseRow(BoxLayout):
     summary_text = StringProperty("")
     list_screen = ObjectProperty(allownone=True)
 
-    def open_actions(self, anchor: Button) -> None:
+    def open_actions(self, _anchor: Button) -> None:
         content = BoxLayout(orientation="vertical", spacing=10, padding=16)
         edit_button = Button(
             text="Edit",
@@ -259,12 +294,8 @@ class ExpenseRow(BoxLayout):
             height=260,
             auto_dismiss=True,
         )
-        edit_button.bind(
-            on_release=lambda _instance: self._trigger_edit(popup)
-        )
-        delete_button.bind(
-            on_release=lambda _instance: self._trigger_delete(popup)
-        )
+        edit_button.bind(on_release=lambda _instance: self._trigger_edit(popup))
+        delete_button.bind(on_release=lambda _instance: self._trigger_delete(popup))
         cancel_button.bind(on_release=lambda _instance: popup.dismiss())
 
         content.add_widget(edit_button)
@@ -309,9 +340,9 @@ class ExpenseListScreen(Screen):
             return
 
         for expense in expenses:
-            notes_line = f"\\n{expense.notes}" if expense.notes else ""
+            notes_line = f"\n{expense.notes}" if expense.notes else ""
             summary = (
-                f"{expense.expense_date}  |  Rs. {expense.amount:.2f}\\n"
+                f"{expense.expense_date}  |  Rs. {expense.amount:.2f}\n"
                 f"{expense.merchant} via {expense.payment_method}{notes_line}"
             )
             container.add_widget(
@@ -378,9 +409,7 @@ class ExpenseListScreen(Screen):
             background_color=(0.68, 0.24, 0.2, 1),
         )
         no_button.bind(on_release=lambda _instance: popup.dismiss())
-        yes_button.bind(
-            on_release=lambda _instance: self._delete_expense(expense, popup)
-        )
+        yes_button.bind(on_release=lambda _instance: self._delete_expense(expense, popup))
         buttons.add_widget(no_button)
         buttons.add_widget(yes_button)
         content.add_widget(buttons)
