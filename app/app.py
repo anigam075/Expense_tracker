@@ -224,8 +224,7 @@ KV = """
 class ExpenseRow(BoxLayout):
     expense_id = NumericProperty(0)
     summary_text = StringProperty("")
-    on_edit = ObjectProperty(lambda: None)
-    on_delete = ObjectProperty(lambda: None)
+    list_screen = ObjectProperty(allownone=True)
 
     def open_actions(self, anchor: Button) -> None:
         content = BoxLayout(orientation="vertical", spacing=10, padding=16)
@@ -261,10 +260,10 @@ class ExpenseRow(BoxLayout):
             auto_dismiss=True,
         )
         edit_button.bind(
-            on_release=lambda _instance: self._trigger_action(popup, self.on_edit)
+            on_release=lambda _instance: self._trigger_edit(popup)
         )
         delete_button.bind(
-            on_release=lambda _instance: self._trigger_action(popup, self.on_delete)
+            on_release=lambda _instance: self._trigger_delete(popup)
         )
         cancel_button.bind(on_release=lambda _instance: popup.dismiss())
 
@@ -273,9 +272,15 @@ class ExpenseRow(BoxLayout):
         content.add_widget(cancel_button)
         popup.open()
 
-    def _trigger_action(self, popup: Popup, callback: ObjectProperty) -> None:
+    def _trigger_edit(self, popup: Popup) -> None:
         popup.dismiss()
-        callback()
+        if self.list_screen is not None and self.expense_id:
+            self.list_screen.edit_expense(self.expense_id)
+
+    def _trigger_delete(self, popup: Popup) -> None:
+        popup.dismiss()
+        if self.list_screen is not None and self.expense_id:
+            self.list_screen.confirm_delete(self.expense_id)
 
 
 class ExpenseListScreen(Screen):
@@ -313,8 +318,7 @@ class ExpenseListScreen(Screen):
                 ExpenseRow(
                     expense_id=expense.id or 0,
                     summary_text=summary,
-                    on_edit=lambda expense_id=expense.id: self.edit_expense(expense_id),
-                    on_delete=lambda expense_id=expense.id: self.confirm_delete(expense_id),
+                    list_screen=self,
                 )
             )
 
