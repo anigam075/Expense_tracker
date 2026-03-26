@@ -11,7 +11,6 @@ from kivy.core.window import Window
 from kivy.properties import ListProperty, NumericProperty, ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
-from kivy.uix.dropdown import DropDown
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen, ScreenManager
@@ -229,36 +228,53 @@ class ExpenseRow(BoxLayout):
     on_delete = ObjectProperty(lambda: None)
 
     def open_actions(self, anchor: Button) -> None:
-        dropdown = DropDown(auto_width=False, width=140)
-
+        content = BoxLayout(orientation="vertical", spacing=10, padding=16)
         edit_button = Button(
             text="Edit",
             size_hint_y=None,
-            height=44,
+            height=48,
             background_normal="",
             background_color=(0.96, 0.94, 0.9, 1),
             color=(0.15, 0.18, 0.16, 1),
         )
-        edit_button.bind(on_release=lambda _instance: self._select_action(dropdown, self.on_edit))
-
         delete_button = Button(
             text="Delete",
             size_hint_y=None,
-            height=44,
+            height=48,
             background_normal="",
             background_color=(0.96, 0.94, 0.9, 1),
             color=(0.68, 0.24, 0.2, 1),
         )
-        delete_button.bind(
-            on_release=lambda _instance: self._select_action(dropdown, self.on_delete)
+        cancel_button = Button(
+            text="Cancel",
+            size_hint_y=None,
+            height=48,
+            background_normal="",
+            background_color=(0.4, 0.45, 0.43, 1),
         )
 
-        dropdown.add_widget(edit_button)
-        dropdown.add_widget(delete_button)
-        dropdown.open(anchor)
+        popup = Popup(
+            title="Expense Actions",
+            content=content,
+            size_hint=(0.75, None),
+            height=260,
+            auto_dismiss=True,
+        )
+        edit_button.bind(
+            on_release=lambda _instance: self._trigger_action(popup, self.on_edit)
+        )
+        delete_button.bind(
+            on_release=lambda _instance: self._trigger_action(popup, self.on_delete)
+        )
+        cancel_button.bind(on_release=lambda _instance: popup.dismiss())
 
-    def _select_action(self, dropdown: DropDown, callback: ObjectProperty) -> None:
-        dropdown.dismiss()
+        content.add_widget(edit_button)
+        content.add_widget(delete_button)
+        content.add_widget(cancel_button)
+        popup.open()
+
+    def _trigger_action(self, popup: Popup, callback: ObjectProperty) -> None:
+        popup.dismiss()
         callback()
 
 
