@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 import tempfile
 import traceback
 from datetime import date
@@ -205,11 +206,14 @@ KV = """
                         valign: "middle"
                         text_size: self.size
                         color: 0.14, 0.18, 0.16, 1
-                    TextInput:
-                        id: date_input
+                    Button:
+                        id: date_button
                         size_hint_x: 0.62
-                        multiline: False
-                        hint_text: "YYYY-MM-DD"
+                        text: root.default_date
+                        background_normal: ""
+                        background_color: 0.92, 0.92, 0.92, 1
+                        color: 0.15, 0.18, 0.16, 1
+                        on_release: root.open_date_picker()
 
                 BoxLayout:
                     size_hint_y: None
@@ -312,6 +316,132 @@ class ExpenseRow(BoxLayout):
         popup.dismiss()
         if self.list_screen is not None and self.expense_id:
             self.list_screen.confirm_delete(self.expense_id)
+
+
+class DatePickerPopup(Popup):
+    selected_date = ObjectProperty(allownone=False)
+    on_select = ObjectProperty(allownone=False)
+    month_label = StringProperty("")
+
+    def __init__(self, selected_date: date, on_select, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.selected_date = selected_date
+        self.on_select = on_select
+        self.today = date.today()
+        self.current_year = selected_date.year
+        self.current_month = selected_date.month
+        self.title = "Select Date"
+        self.size_hint = (0.94, None)
+        self.height = 520
+        self.auto_dismiss = True
+        self._build_content()
+        self._refresh_days()
+
+    def _build_content(self) -> None:
+        content = BoxLayout(orientation="vertical", spacing=10, padding=16)
+
+        header = BoxLayout(size_hint_y=None, height=44, spacing=10)
+        prev_button = Button(
+            text="<",
+            background_normal="",
+            background_color=(0.4, 0.45, 0.43, 1),
+        )
+        next_button = Button(
+            text=">",
+            background_normal="",
+            background_color=(0.4, 0.45, 0.43, 1),
+        )
+        self.month_header = Label(color=(0.15, 0.18, 0.16, 1), bold=True)
+        prev_button.bind(on_release=lambda _instance: self._change_month(-1))
+        next_button.bind(on_release=lambda _instance: self._change_month(1))
+        header.add_widget(prev_button)
+        header.add_widget(self.month_header)
+        header.add_widget(next_button)
+        content.add_widget(header)
+
+        weekday_row = BoxLayout(size_hint_y=None, height=28, spacing=4)
+        for day_name in ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]:
+            weekday_row.add_widget(Label(text=day_name, color=(0.3, 0.34, 0.32, 1)))
+        content.add_widget(weekday_row)
+
+        self.days_grid = BoxLayout(orientation="vertical", spacing=4)
+        content.add_widget(self.days_grid)
+
+        footer = BoxLayout(size_hint_y=None, height=48, spacing=10)
+        today_button = Button(
+            text="Today",
+            background_normal="",
+            background_color=(0.18, 0.5, 0.32, 1),
+        )
+        close_button = Button(
+            text="Close",
+            background_normal="",
+            background_color=(0.4, 0.45, 0.43, 1),
+        )
+        today_button.bind(on_release=lambda _instance: self._select(self.today))
+        close_button.bind(on_release=lambda _instance: self.dismiss())
+        footer.add_widget(today_button)
+        footer.add_widget(close_button)
+        content.add_widget(footer)
+
+        self.content = content
+
+    def _refresh_days(self) -> None:
+        self.month_header.text = f"{calendar.month_name[self.current_month]} {self.current_year}"
+        self.days_grid.clear_widgets()
+
+        month_matrix = calendar.Calendar(firstweekday=0).monthdatescalendar(
+            self.current_year,
+            self.current_month,
+        )
+        for week in month_matrix:
+            row = BoxLayout(size_hint_y=None, height=44, spacing=4)
+            for day_value in week:
+                in_month = day_value.month == self.current_month
+                is_future = day_value > self.today
+                button = Button(
+                    text=str(day_value.day) if in_month else "",
+                    disabled=(not in_month) or is_future,
+                    background_normal="",
+                    background_color=self._day_color(day_value, in_month, is_future),
+                    color=(0.15, 0.18, 0.16, 1),
+                )
+                if in_month and not is_future:
+                    button.bind(
+                        on_release=lambda _instance, selected=day_value: self._select(selected)
+                    )
+                row.add_widget(button)
+            self.days_grid.add_widget(row)
+
+    def _change_month(self, direction: int) -> None:
+        month = self.current_month + direction
+        year = self.current_year
+        if month < 1:
+            month = 12
+            year -= 1
+        elif month > 12:
+            month = 1
+            year += 1
+
+        if date(year, month, 1) > date(self.today.year, self.today.month, 1):
+            return
+
+        self.current_year = year
+        self.current_month = month
+        self._refresh_days()
+
+    def _select(self, selected: date) -> None:
+        self.on_select(selected)
+        self.dismiss()
+
+    def _day_color(self, day_value: date, in_month: bool, is_future: bool) -> tuple[float, float, float, float]:
+        if not in_month:
+            return (0.9, 0.9, 0.9, 0.35)
+        if is_future:
+            return (0.85, 0.85, 0.85, 0.5)
+        if day_value == self.selected_date:
+            return (0.18, 0.5, 0.32, 1)
+        return (1, 1, 1, 1)
 
 
 class ExpenseListScreen(Screen):
@@ -469,7 +599,7 @@ class ExpenseEditScreen(Screen):
         amount_text = self.ids.amount_input.text.strip()
         merchant = self.ids.merchant_input.text.strip()
         payment_method = self.ids.payment_method_input.text.strip()
-        expense_date = self.ids.date_input.text.strip()
+        expense_date = self.ids.date_button.text.strip()
         notes = self.ids.notes_input.text.strip()
 
         if not amount_text or not merchant or not expense_date:
@@ -516,12 +646,23 @@ class ExpenseEditScreen(Screen):
     def cancel(self) -> None:
         self.manager.current = "list"
 
+    def open_date_picker(self) -> None:
+        selected_date = date.fromisoformat(self.ids.date_button.text)
+        popup = DatePickerPopup(
+            selected_date=selected_date,
+            on_select=self._set_selected_date,
+        )
+        popup.open()
+
     def _fill_form(self, expense: ExpenseRecord) -> None:
         self.ids.amount_input.text = f"{expense.amount:.2f}" if expense.amount else ""
         self.ids.merchant_input.text = expense.merchant
         self.ids.payment_method_input.text = expense.payment_method or "UPI"
-        self.ids.date_input.text = expense.expense_date or self.default_date
+        self.ids.date_button.text = expense.expense_date or self.default_date
         self.ids.notes_input.text = expense.notes
+
+    def _set_selected_date(self, selected: date) -> None:
+        self.ids.date_button.text = selected.isoformat()
 
     def _set_feedback(self, message: str, *, is_error: bool) -> None:
         self.feedback_message = message
