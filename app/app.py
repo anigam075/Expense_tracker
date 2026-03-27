@@ -12,9 +12,11 @@ from kivy.lang import Builder
 from kivy.properties import ListProperty, NumericProperty, ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
+from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen, ScreenManager
+from kivy.uix.spinner import Spinner
 
 from app.database import ExpenseRepository
 from app.models import ExpenseRecord
@@ -321,7 +323,6 @@ class ExpenseRow(BoxLayout):
 class DatePickerPopup(Popup):
     selected_date = ObjectProperty(allownone=False)
     on_select = ObjectProperty(allownone=False)
-    month_label = StringProperty("")
 
     def __init__(self, selected_date: date, on_select, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -331,40 +332,63 @@ class DatePickerPopup(Popup):
         self.current_year = selected_date.year
         self.current_month = selected_date.month
         self.title = "Select Date"
-        self.size_hint = (0.94, None)
-        self.height = 520
+        self.size_hint = (0.96, None)
+        self.height = 600
         self.auto_dismiss = True
+        self.month_names = list(calendar.month_name)[1:]
+        self.year_values = [str(year) for year in range(self.today.year, self.today.year - 30, -1)]
         self._build_content()
         self._refresh_days()
 
     def _build_content(self) -> None:
-        content = BoxLayout(orientation="vertical", spacing=10, padding=16)
+        content = BoxLayout(orientation="vertical", spacing=12, padding=16)
 
-        header = BoxLayout(size_hint_y=None, height=44, spacing=10)
+        header = BoxLayout(size_hint_y=None, height=48, spacing=8)
         prev_button = Button(
             text="<",
+            size_hint_x=0.14,
             background_normal="",
             background_color=(0.4, 0.45, 0.43, 1),
         )
         next_button = Button(
             text=">",
+            size_hint_x=0.14,
             background_normal="",
             background_color=(0.4, 0.45, 0.43, 1),
         )
-        self.month_header = Label(color=(0.15, 0.18, 0.16, 1), bold=True)
+        self.month_spinner = Spinner(
+            text=calendar.month_name[self.current_month],
+            values=self.month_names,
+            size_hint_x=0.44,
+            background_normal="",
+            background_color=(0.92, 0.92, 0.92, 1),
+            color=(0.15, 0.18, 0.16, 1),
+        )
+        self.year_spinner = Spinner(
+            text=str(self.current_year),
+            values=self.year_values,
+            size_hint_x=0.28,
+            background_normal="",
+            background_color=(0.92, 0.92, 0.92, 1),
+            color=(0.15, 0.18, 0.16, 1),
+        )
         prev_button.bind(on_release=lambda _instance: self._change_month(-1))
         next_button.bind(on_release=lambda _instance: self._change_month(1))
+        self.month_spinner.bind(text=self._on_month_selected)
+        self.year_spinner.bind(text=self._on_year_selected)
         header.add_widget(prev_button)
-        header.add_widget(self.month_header)
+        header.add_widget(self.month_spinner)
+        header.add_widget(self.year_spinner)
         header.add_widget(next_button)
         content.add_widget(header)
 
-        weekday_row = BoxLayout(size_hint_y=None, height=28, spacing=4)
+        weekday_row = GridLayout(cols=7, size_hint_y=None, height=28, spacing=4)
         for day_name in ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]:
             weekday_row.add_widget(Label(text=day_name, color=(0.3, 0.34, 0.32, 1)))
         content.add_widget(weekday_row)
 
-        self.days_grid = BoxLayout(orientation="vertical", spacing=4)
+        self.days_grid = GridLayout(cols=7, spacing=4, size_hint_y=None)
+        self.days_grid.bind(minimum_height=self.days_grid.setter("height"))
         content.add_widget(self.days_grid)
 
         footer = BoxLayout(size_hint_y=None, height=48, spacing=10)
@@ -387,7 +411,8 @@ class DatePickerPopup(Popup):
         self.content = content
 
     def _refresh_days(self) -> None:
-        self.month_header.text = f"{calendar.month_name[self.current_month]} {self.current_year}"
+        self.month_spinner.text = calendar.month_name[self.current_month]
+        self.year_spinner.text = str(self.current_year)
         self.days_grid.clear_widgets()
 
         month_matrix = calendar.Calendar(firstweekday=0).monthdatescalendar(
@@ -395,12 +420,13 @@ class DatePickerPopup(Popup):
             self.current_month,
         )
         for week in month_matrix:
-            row = BoxLayout(size_hint_y=None, height=44, spacing=4)
             for day_value in week:
                 in_month = day_value.month == self.current_month
                 is_future = day_value > self.today
                 button = Button(
                     text=str(day_value.day) if in_month else "",
+                    size_hint_y=None,
+                    height=40,
                     disabled=(not in_month) or is_future,
                     background_normal="",
                     background_color=self._day_color(day_value, in_month, is_future),
@@ -410,8 +436,7 @@ class DatePickerPopup(Popup):
                     button.bind(
                         on_release=lambda _instance, selected=day_value: self._select(selected)
                     )
-                row.add_widget(button)
-            self.days_grid.add_widget(row)
+                self.days_grid.add_widget(button)
 
     def _change_month(self, direction: int) -> None:
         month = self.current_month + direction
@@ -430,17 +455,39 @@ class DatePickerPopup(Popup):
         self.current_month = month
         self._refresh_days()
 
+    def _on_month_selected(self, _spinner: Spinner, month_name: str) -> None:
+        month_index = self.month_names.index(month_name) + 1
+        if month_index == self.current_month:
+            return
+        self.current_month = month_index
+        if date(self.current_year, self.current_month, 1) > date(self.today.year, self.today.month, 1):
+            self.current_year = self.today.year
+            self.current_month = self.today.month
+        self._refresh_days()
+
+    def _on_year_selected(self, _spinner: Spinner, year_text: str) -> None:
+        selected_year = int(year_text)
+        if selected_year == self.current_year:
+            return
+        self.current_year = selected_year
+        if date(self.current_year, self.current_month, 1) > date(self.today.year, self.today.month, 1):
+            self.current_year = self.today.year
+            self.current_month = self.today.month
+        self._refresh_days()
+
     def _select(self, selected: date) -> None:
         self.on_select(selected)
         self.dismiss()
 
     def _day_color(self, day_value: date, in_month: bool, is_future: bool) -> tuple[float, float, float, float]:
         if not in_month:
-            return (0.9, 0.9, 0.9, 0.35)
+            return (0.94, 0.94, 0.94, 1)
         if is_future:
-            return (0.85, 0.85, 0.85, 0.5)
+            return (0.88, 0.88, 0.88, 1)
         if day_value == self.selected_date:
             return (0.18, 0.5, 0.32, 1)
+        if day_value == self.today:
+            return (0.83, 0.92, 0.86, 1)
         return (1, 1, 1, 1)
 
 
