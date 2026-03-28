@@ -545,7 +545,7 @@ class ExpenseRow(BoxLayout):
         edit_button = Button(
             text="Edit",
             size_hint_y=None,
-            height=48,
+            height=58,
             background_normal="",
             background_color=(0.96, 0.94, 0.9, 1),
             color=(0.15, 0.18, 0.16, 1),
@@ -553,7 +553,7 @@ class ExpenseRow(BoxLayout):
         delete_button = Button(
             text="Delete",
             size_hint_y=None,
-            height=48,
+            height=58,
             background_normal="",
             background_color=(0.96, 0.94, 0.9, 1),
             color=(0.68, 0.24, 0.2, 1),
@@ -561,7 +561,7 @@ class ExpenseRow(BoxLayout):
         cancel_button = Button(
             text="Cancel",
             size_hint_y=None,
-            height=48,
+            height=58,
             background_normal="",
             background_color=(0.4, 0.45, 0.43, 1),
         )
@@ -570,7 +570,7 @@ class ExpenseRow(BoxLayout):
             title="Expense Actions",
             content=content,
             size_hint=(0.75, None),
-            height=260,
+            height=300,
             auto_dismiss=True,
         )
         edit_button.bind(on_release=lambda _instance: self._trigger_edit(popup))
@@ -639,7 +639,7 @@ class DatePickerPopup(Popup):
         self.current_month = selected_date.month
         self.title = "Select Date"
         self.size_hint = (0.96, None)
-        self.height = 600
+        self.height = 680
         self.auto_dismiss = True
         self.month_names = list(calendar.month_name)[1:]
         self.year_values = [str(year) for year in range(self.today.year, self.today.year - 30, -1)]
@@ -649,18 +649,20 @@ class DatePickerPopup(Popup):
     def _build_content(self) -> None:
         content = BoxLayout(orientation="vertical", spacing=12, padding=16)
 
-        header = BoxLayout(size_hint_y=None, height=48, spacing=8)
+        header = BoxLayout(size_hint_y=None, height=60, spacing=10)
         prev_button = Button(
             text="<",
             size_hint_x=0.14,
             background_normal="",
             background_color=(0.4, 0.45, 0.43, 1),
+            font_size="18sp",
         )
         next_button = Button(
             text=">",
             size_hint_x=0.14,
             background_normal="",
             background_color=(0.4, 0.45, 0.43, 1),
+            font_size="18sp",
         )
         self.month_spinner = Spinner(
             text=calendar.month_name[self.current_month],
@@ -669,6 +671,7 @@ class DatePickerPopup(Popup):
             background_normal="",
             background_color=(0.92, 0.92, 0.92, 1),
             color=(0.15, 0.18, 0.16, 1),
+            font_size="16sp",
         )
         self.year_spinner = Spinner(
             text=str(self.current_year),
@@ -677,6 +680,7 @@ class DatePickerPopup(Popup):
             background_normal="",
             background_color=(0.92, 0.92, 0.92, 1),
             color=(0.15, 0.18, 0.16, 1),
+            font_size="16sp",
         )
         prev_button.bind(on_release=lambda _instance: self._change_month(-1))
         next_button.bind(on_release=lambda _instance: self._change_month(1))
@@ -688,25 +692,27 @@ class DatePickerPopup(Popup):
         header.add_widget(next_button)
         content.add_widget(header)
 
-        weekday_row = GridLayout(cols=7, size_hint_y=None, height=28, spacing=4)
+        weekday_row = GridLayout(cols=7, size_hint_y=None, height=34, spacing=6)
         for day_name in ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]:
-            weekday_row.add_widget(Label(text=day_name, color=(0.3, 0.34, 0.32, 1)))
+            weekday_row.add_widget(Label(text=day_name, font_size="13sp", color=(0.3, 0.34, 0.32, 1)))
         content.add_widget(weekday_row)
 
-        self.days_grid = GridLayout(cols=7, spacing=4, size_hint_y=None)
+        self.days_grid = GridLayout(cols=7, spacing=6, size_hint_y=None)
         self.days_grid.bind(minimum_height=self.days_grid.setter("height"))
         content.add_widget(self.days_grid)
 
-        footer = BoxLayout(size_hint_y=None, height=48, spacing=10)
+        footer = BoxLayout(size_hint_y=None, height=58, spacing=12)
         today_button = Button(
             text="Today",
             background_normal="",
             background_color=(0.18, 0.5, 0.32, 1),
+            font_size="16sp",
         )
         close_button = Button(
             text="Close",
             background_normal="",
             background_color=(0.4, 0.45, 0.43, 1),
+            font_size="16sp",
         )
         today_button.bind(on_release=lambda _instance: self._select(self.today))
         close_button.bind(on_release=lambda _instance: self.dismiss())
@@ -732,11 +738,12 @@ class DatePickerPopup(Popup):
                 button = Button(
                     text=str(day_value.day) if in_month else "",
                     size_hint_y=None,
-                    height=40,
+                    height=48,
                     disabled=(not in_month) or is_future,
                     background_normal="",
                     background_color=self._day_color(day_value, in_month, is_future),
                     color=(0.15, 0.18, 0.16, 1),
+                    font_size="15sp",
                 )
                 if in_month and not is_future:
                     button.bind(
