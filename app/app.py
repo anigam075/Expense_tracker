@@ -25,6 +25,7 @@ KV = """
 #:import dp kivy.metrics.dp
 
 <ExpenseRow>:
+    action_button: action_button
     size_hint_y: None
     height: "118dp"
     padding: 0, "5dp", 0, "5dp"
@@ -125,6 +126,7 @@ KV = """
             Widget:
 
             Button:
+                id: action_button
                 text: "..."
                 size_hint_y: None
                 height: "34dp"
@@ -531,6 +533,7 @@ class ExpenseRow(BoxLayout):
     date_text = StringProperty("")
     method_text = StringProperty("")
     list_screen = ObjectProperty(allownone=True)
+    action_button = ObjectProperty(allownone=True)
 
     def open_actions(self, _anchor: Button) -> None:
         content = BoxLayout(orientation="vertical", spacing=10, padding=16)
@@ -583,6 +586,16 @@ class ExpenseRow(BoxLayout):
         popup.dismiss()
         if self.list_screen is not None and self.expense_id:
             self.list_screen.confirm_delete(self.expense_id)
+
+    def on_touch_up(self, touch) -> bool:
+        if not self.collide_point(*touch.pos):
+            return super().on_touch_up(touch)
+        if self.action_button is not None and self.action_button.collide_point(*touch.pos):
+            return super().on_touch_up(touch)
+        if self.list_screen is not None and self.expense_id:
+            self.list_screen.view_expense(self.expense_id)
+            return True
+        return super().on_touch_up(touch)
 
 
 class DatePickerPopup(Popup):
@@ -831,6 +844,19 @@ class ExpenseListScreen(Screen):
         edit_screen.load_expense(expense_id)
         self.manager.current = "edit"
 
+    def view_expense(self, expense_id: int | None) -> None:
+        if expense_id is None:
+            self._set_status("Unable to open this expense.", is_error=True)
+            return
+
+        expense = self.repository.get_expense(expense_id)
+        if expense is None:
+            self._set_status("Expense not found.", is_error=True)
+            self.refresh_expenses()
+            return
+
+        self._open_expense_detail_popup(expense)
+
     def show_saved_status(self, message: str) -> None:
         self._set_status(message, is_error=False)
 
@@ -897,6 +923,95 @@ class ExpenseListScreen(Screen):
         with instance.canvas.before:
             Color(1, 1, 1, 1)
             RoundedRectangle(pos=instance.pos, size=instance.size, radius=[24, 24, 24, 24])
+
+    def _open_expense_detail_popup(self, expense: ExpenseRecord) -> None:
+        content = BoxLayout(orientation="vertical", spacing=12, padding=16)
+
+        header = BoxLayout(size_hint_y=None, height=38)
+        title = Label(
+            text="Expense Details",
+            halign="left",
+            valign="middle",
+            color=(0.14, 0.18, 0.16, 1),
+            bold=True,
+        )
+        title.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        close_button = Button(
+            text="X",
+            size_hint=(None, None),
+            size=(38, 38),
+            background_normal="",
+            background_down="",
+            background_color=(0.92, 0.94, 0.93, 1),
+            color=(0.22, 0.26, 0.24, 1),
+        )
+        header.add_widget(title)
+        header.add_widget(close_button)
+        content.add_widget(header)
+
+        field_container = BoxLayout(orientation="vertical", spacing=10)
+        fields = [
+            ("Amount", f"Rs. {expense.amount:.2f}"),
+            ("Merchant", expense.merchant),
+            ("Payment Method", expense.payment_method),
+            ("Date", expense.expense_date),
+            ("Notes", expense.notes or "No additional notes"),
+        ]
+        for label_text, value_text in fields:
+            field_container.add_widget(
+                self._build_detail_row(label_text, value_text, multiline=(label_text == "Notes"))
+            )
+        content.add_widget(field_container)
+
+        popup = Popup(
+            title="",
+            separator_height=0,
+            content=content,
+            size_hint=(0.9, None),
+            height=420,
+            auto_dismiss=True,
+        )
+        close_button.bind(on_release=lambda _instance: popup.dismiss())
+        popup.open()
+
+    def _build_detail_row(self, label_text: str, value_text: str, *, multiline: bool = False) -> BoxLayout:
+        row_height = 104 if multiline else 64
+        row = BoxLayout(orientation="vertical", spacing=4, size_hint_y=None, height=row_height, padding=(14, 10))
+
+        def redraw_card(instance: BoxLayout, _value) -> None:
+            from kivy.graphics import Color, RoundedRectangle
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(0.98, 0.98, 0.97, 1)
+                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[18, 18, 18, 18])
+
+        row.bind(pos=redraw_card, size=redraw_card)
+        redraw_card(row, None)
+
+        label = Label(
+            text=label_text,
+            size_hint_y=None,
+            height=18,
+            halign="left",
+            valign="middle",
+            color=(0.45, 0.5, 0.48, 1),
+            font_size="12sp",
+        )
+        value = Label(
+            text=value_text,
+            halign="left",
+            valign="top" if multiline else "middle",
+            color=(0.15, 0.18, 0.16, 1),
+            font_size="16sp",
+            shorten=not multiline,
+            shorten_from="right",
+        )
+        label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        value.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        row.add_widget(label)
+        row.add_widget(value)
+        return row
 
 
 class ExpenseEditScreen(Screen):
