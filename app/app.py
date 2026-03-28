@@ -26,8 +26,8 @@ KV = """
 
 <ExpenseRow>:
     size_hint_y: None
-    height: "132dp"
-    padding: 0, "6dp", 0, "6dp"
+    height: "118dp"
+    padding: 0, "5dp", 0, "5dp"
     canvas.before:
         Color:
             rgba: 1, 1, 1, 1
@@ -42,25 +42,26 @@ KV = """
             width: 1.1
 
     BoxLayout:
-        padding: "16dp"
-        spacing: "12dp"
+        padding: "14dp"
+        spacing: "14dp"
 
         BoxLayout:
             orientation: "vertical"
-            spacing: "6dp"
+            spacing: "4dp"
 
             BoxLayout:
                 size_hint_y: None
-                height: "26dp"
+                height: "24dp"
                 spacing: "8dp"
 
                 Label:
                     text: root.method_text
                     size_hint_x: None
-                    width: self.texture_size[0] + dp(24)
+                    width: "76dp"
                     halign: "center"
                     valign: "middle"
                     text_size: self.size
+                    font_size: "13sp"
                     color: 0.11, 0.31, 0.21, 1
                     bold: True
                     canvas.before:
@@ -76,16 +77,19 @@ KV = """
                     halign: "left"
                     valign: "middle"
                     text_size: self.size
+                    font_size: "13sp"
                     color: 0.42, 0.47, 0.45, 1
 
             Label:
                 text: root.merchant_text
                 size_hint_y: None
-                height: "32dp"
+                height: "30dp"
                 halign: "left"
                 valign: "middle"
                 text_size: self.width, None
-                font_size: "19sp"
+                shorten: True
+                shorten_from: "right"
+                font_size: "20sp"
                 bold: True
                 color: 0.13, 0.16, 0.15, 1
 
@@ -96,23 +100,25 @@ KV = """
                 halign: "left"
                 valign: "middle"
                 text_size: self.width, None
+                shorten: True
+                shorten_from: "right"
                 color: 0.53, 0.57, 0.55, 1
                 opacity: 1 if root.note_text else 0
 
         BoxLayout:
             orientation: "vertical"
             size_hint_x: None
-            width: "96dp"
-            spacing: "10dp"
+            width: "92dp"
+            spacing: "8dp"
 
             Label:
                 text: root.amount_text
                 size_hint_y: None
-                height: "44dp"
+                height: "50dp"
                 halign: "right"
-                valign: "middle"
-                text_size: self.size
-                font_size: "20sp"
+                valign: "top"
+                text_size: self.width, self.height
+                font_size: "19sp"
                 bold: True
                 color: 0.11, 0.31, 0.21, 1
 
@@ -121,8 +127,8 @@ KV = """
             Button:
                 text: "..."
                 size_hint_y: None
-                height: "38dp"
-                font_size: "20sp"
+                height: "34dp"
+                font_size: "18sp"
                 bold: True
                 background_normal: ""
                 background_down: ""
