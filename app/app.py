@@ -22,84 +22,269 @@ from app.database import ExpenseRepository
 from app.models import ExpenseRecord
 
 KV = """
+#:import dp kivy.metrics.dp
+
 <ExpenseRow>:
     size_hint_y: None
-    height: "92dp"
-    padding: "10dp"
-    spacing: "10dp"
-    orientation: "horizontal"
+    height: "132dp"
+    padding: 0, "6dp", 0, "6dp"
     canvas.before:
         Color:
             rgba: 1, 1, 1, 1
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [16, 16, 16, 16]
+            radius: [22, 22, 22, 22]
+        Color:
+            rgba: 0.88, 0.92, 0.9, 1
+        Line:
+            rounded_rectangle: [self.x, self.y, self.width, self.height, 22]
+            width: 1.1
 
-    Label:
-        text: root.summary_text
-        size_hint_x: 0.84
-        halign: "left"
-        valign: "middle"
-        text_size: self.width - 8, self.height - 8
-        color: 0.15, 0.18, 0.16, 1
+    BoxLayout:
+        padding: "16dp"
+        spacing: "12dp"
 
-    Button:
-        text: "..."
-        size_hint_x: 0.16
-        font_size: "20sp"
-        bold: True
-        background_normal: ""
-        background_down: ""
-        background_color: 0.93, 0.9, 0.84, 1
-        color: 0.15, 0.18, 0.16, 1
-        on_release: root.open_actions(self)
+        BoxLayout:
+            orientation: "vertical"
+            spacing: "6dp"
+
+            BoxLayout:
+                size_hint_y: None
+                height: "26dp"
+                spacing: "8dp"
+
+                Label:
+                    text: root.method_text
+                    size_hint_x: None
+                    width: self.texture_size[0] + dp(24)
+                    halign: "center"
+                    valign: "middle"
+                    text_size: self.size
+                    color: 0.11, 0.31, 0.21, 1
+                    bold: True
+                    canvas.before:
+                        Color:
+                            rgba: 0.86, 0.94, 0.89, 1
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [13, 13, 13, 13]
+
+                Label:
+                    text: root.date_text
+                    halign: "left"
+                    valign: "middle"
+                    text_size: self.size
+                    color: 0.42, 0.47, 0.45, 1
+
+            Label:
+                text: root.merchant_text
+                size_hint_y: None
+                height: "32dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, None
+                font_size: "19sp"
+                bold: True
+                color: 0.13, 0.16, 0.15, 1
+
+            Label:
+                text: root.note_text
+                size_hint_y: None
+                height: "22dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, None
+                color: 0.53, 0.57, 0.55, 1
+                opacity: 1 if root.note_text else 0
+
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_x: None
+            width: "96dp"
+            spacing: "10dp"
+
+            Label:
+                text: root.amount_text
+                size_hint_y: None
+                height: "44dp"
+                halign: "right"
+                valign: "middle"
+                text_size: self.size
+                font_size: "20sp"
+                bold: True
+                color: 0.11, 0.31, 0.21, 1
+
+            Widget:
+
+            Button:
+                text: "..."
+                size_hint_y: None
+                height: "38dp"
+                font_size: "20sp"
+                bold: True
+                background_normal: ""
+                background_down: ""
+                background_color: 0.93, 0.95, 0.94, 1
+                color: 0.14, 0.18, 0.16, 1
+                on_release: root.open_actions(self)
 
 <ExpenseListScreen>:
     name: "list"
     BoxLayout:
         orientation: "vertical"
-        spacing: "12dp"
-        padding: "16dp"
         canvas.before:
             Color:
-                rgba: 0.96, 0.94, 0.9, 1
+                rgba: 0.97, 0.95, 0.91, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
 
-        Label:
-            text: "Expenses"
+        BoxLayout:
+            orientation: "vertical"
             size_hint_y: None
-            height: "40dp"
-            font_size: "28sp"
-            bold: True
-            color: 0.14, 0.18, 0.16, 1
+            height: "258dp"
+            padding: "18dp"
+            spacing: "14dp"
+            canvas.before:
+                Color:
+                    rgba: 0.14, 0.35, 0.27, 1
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [0, 0, 30, 30]
 
-        Label:
-            text: root.status_message
-            size_hint_y: None
-            height: "24dp"
-            color: root.status_color
+            Label:
+                text: "Expense Atlas"
+                size_hint_y: None
+                height: "34dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                font_size: "31sp"
+                bold: True
+                color: 1, 1, 1, 1
 
-        Button:
-            text: "Add Expense"
-            size_hint_y: None
-            height: "48dp"
-            background_normal: ""
-            background_color: 0.18, 0.5, 0.32, 1
-            on_release: root.add_expense()
-
-        ScrollView:
-            do_scroll_x: False
+            Label:
+                text: "Track every rupee with a cleaner, calmer daily flow."
+                size_hint_y: None
+                height: "22dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                color: 0.84, 0.93, 0.89, 1
 
             BoxLayout:
-                id: list_container
-                orientation: "vertical"
                 size_hint_y: None
-                height: self.minimum_height
-                spacing: "10dp"
-                padding: 0, 0, 0, "12dp"
+                height: "116dp"
+                spacing: "12dp"
+
+                BoxLayout:
+                    orientation: "vertical"
+                    padding: "14dp"
+                    canvas.before:
+                        Color:
+                            rgba: 0.98, 0.97, 0.94, 1
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [24, 24, 24, 24]
+                    Label:
+                        text: "Total Logged"
+                        size_hint_y: None
+                        height: "22dp"
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.width, self.height
+                        color: 0.47, 0.52, 0.49, 1
+                    Label:
+                        text: root.total_amount_text
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.width, self.height
+                        font_size: "28sp"
+                        bold: True
+                        color: 0.13, 0.16, 0.15, 1
+
+                BoxLayout:
+                    orientation: "vertical"
+                    size_hint_x: 0.42
+                    padding: "14dp"
+                    canvas.before:
+                        Color:
+                            rgba: 0.2, 0.48, 0.37, 1
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [24, 24, 24, 24]
+                    Label:
+                        text: "Entries"
+                        size_hint_y: None
+                        height: "22dp"
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.width, self.height
+                        color: 0.86, 0.95, 0.9, 1
+                    Label:
+                        text: root.expense_count_text
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.width, self.height
+                        font_size: "32sp"
+                        bold: True
+                        color: 1, 1, 1, 1
+
+            Label:
+                text: root.status_message
+                size_hint_y: None
+                height: "24dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                color: root.status_color
+
+        BoxLayout:
+            orientation: "vertical"
+            padding: "18dp"
+            spacing: "14dp"
+
+            BoxLayout:
+                size_hint_y: None
+                height: "54dp"
+                spacing: "12dp"
+
+                Label:
+                    text: "Recent Expenses"
+                    halign: "left"
+                    valign: "middle"
+                    text_size: self.size
+                    font_size: "23sp"
+                    bold: True
+                    color: 0.15, 0.18, 0.16, 1
+
+                Button:
+                    text: "+ Add Expense"
+                    size_hint_x: None
+                    width: "152dp"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.21, 0.56, 0.39, 1
+                    color: 1, 1, 1, 1
+                    bold: True
+                    on_release: root.add_expense()
+
+            ScrollView:
+                do_scroll_x: False
+                bar_width: "4dp"
+
+                BoxLayout:
+                    id: list_container
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: "12dp"
+                    padding: 0, 0, 0, "20dp"
 
 <ExpenseEditScreen>:
     name: "edit"
@@ -107,7 +292,7 @@ KV = """
         orientation: "vertical"
         canvas.before:
             Color:
-                rgba: 0.96, 0.94, 0.9, 1
+                rgba: 0.97, 0.95, 0.91, 1
             Rectangle:
                 pos: self.pos
                 size: self.size
@@ -115,148 +300,218 @@ KV = """
         ScrollView:
             do_scroll_x: False
             scroll_type: ['bars', 'content']
+            bar_width: "4dp"
 
             BoxLayout:
                 size_hint_y: None
                 height: max(self.minimum_height, root.height)
                 orientation: "vertical"
-                spacing: "12dp"
-                padding: "16dp"
-
-                Widget:
-                    size_hint_y: None
-                    height: "6dp"
-
-                Label:
-                    text: root.screen_title
-                    size_hint_y: None
-                    height: "40dp"
-                    font_size: "28sp"
-                    bold: True
-                    color: 0.14, 0.18, 0.16, 1
-
-                Label:
-                    text: root.feedback_message
-                    size_hint_y: None
-                    height: "24dp"
-                    color: root.feedback_color
+                padding: 0, 0, 0, "24dp"
 
                 BoxLayout:
+                    orientation: "vertical"
                     size_hint_y: None
-                    height: "48dp"
-                    spacing: "10dp"
-
-                    Label:
-                        text: "Amount"
-                        size_hint_x: 0.38
-                        halign: "left"
-                        valign: "middle"
-                        text_size: self.size
-                        color: 0.14, 0.18, 0.16, 1
-                    TextInput:
-                        id: amount_input
-                        size_hint_x: 0.62
-                        multiline: False
-                        hint_text: "e.g. 245.50"
-                        input_filter: "float"
-
-                BoxLayout:
-                    size_hint_y: None
-                    height: "48dp"
-                    spacing: "10dp"
-
-                    Label:
-                        text: "Merchant"
-                        size_hint_x: 0.38
-                        halign: "left"
-                        valign: "middle"
-                        text_size: self.size
-                        color: 0.14, 0.18, 0.16, 1
-                    TextInput:
-                        id: merchant_input
-                        size_hint_x: 0.62
-                        multiline: False
-                        hint_text: "Where did you spend?"
-
-                BoxLayout:
-                    size_hint_y: None
-                    height: "48dp"
-                    spacing: "10dp"
-
-                    Label:
-                        text: "Payment Method"
-                        size_hint_x: 0.38
-                        halign: "left"
-                        valign: "middle"
-                        text_size: self.size
-                        color: 0.14, 0.18, 0.16, 1
-                    Spinner:
-                        id: payment_method_input
-                        size_hint_x: 0.62
-                        text: "UPI"
-                        values: ["UPI", "Card", "Cash", "Net Banking", "Wallet", "Other"]
-
-                BoxLayout:
-                    size_hint_y: None
-                    height: "48dp"
-                    spacing: "10dp"
-
-                    Label:
-                        text: "Date"
-                        size_hint_x: 0.38
-                        halign: "left"
-                        valign: "middle"
-                        text_size: self.size
-                        color: 0.14, 0.18, 0.16, 1
-                    Button:
-                        id: date_button
-                        size_hint_x: 0.62
-                        text: root.default_date
-                        background_normal: ""
-                        background_color: 0.92, 0.92, 0.92, 1
-                        color: 0.15, 0.18, 0.16, 1
-                        on_release: root.open_date_picker()
-
-                BoxLayout:
-                    size_hint_y: None
-                    height: "120dp"
-                    spacing: "10dp"
-
-                    Label:
-                        text: "Notes"
-                        size_hint_x: 0.38
-                        halign: "left"
-                        valign: "top"
-                        text_size: self.size
-                        color: 0.14, 0.18, 0.16, 1
-                    TextInput:
-                        id: notes_input
-                        size_hint_x: 0.62
-                        hint_text: "Optional details"
-
-                Widget:
-                    size_hint_y: 1
-
-                BoxLayout:
-                    size_hint_y: None
-                    height: "48dp"
-                    spacing: "10dp"
+                    height: "218dp"
+                    padding: "18dp"
+                    spacing: "12dp"
+                    canvas.before:
+                        Color:
+                            rgba: 0.14, 0.35, 0.27, 1
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [0, 0, 30, 30]
 
                     Button:
-                        text: "Cancel"
+                        text: "< Back"
+                        size_hint: None, None
+                        size: "88dp", "34dp"
                         background_normal: ""
-                        background_color: 0.4, 0.45, 0.43, 1
+                        background_down: ""
+                        background_color: 0.22, 0.48, 0.39, 1
+                        color: 1, 1, 1, 1
                         on_release: root.cancel()
 
-                    Button:
-                        text: root.action_button_text
-                        background_normal: ""
-                        background_color: 0.18, 0.5, 0.32, 1
-                        on_release: root.save_expense()
+                    Label:
+                        text: root.screen_title
+                        size_hint_y: None
+                        height: "38dp"
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.width, self.height
+                        font_size: "30sp"
+                        bold: True
+                        color: 1, 1, 1, 1
 
-                Widget:
+                    Label:
+                        text: root.feedback_message
+                        size_hint_y: None
+                        height: "22dp"
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.width, self.height
+                        color: root.feedback_color
+
+                    Label:
+                        text: "Keep things quick, clean, and editable."
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.width, self.height
+                        color: 0.84, 0.93, 0.89, 1
+
+                BoxLayout:
+                    orientation: "vertical"
                     size_hint_y: None
-                    height: "24dp"
+                    height: self.minimum_height
+                    padding: "18dp"
+                    spacing: "14dp"
+
+                    BoxLayout:
+                        orientation: "vertical"
+                        size_hint_y: None
+                        height: self.minimum_height
+                        padding: "18dp"
+                        spacing: "14dp"
+                        canvas.before:
+                            Color:
+                                rgba: 1, 1, 1, 1
+                            RoundedRectangle:
+                                pos: self.pos
+                                size: self.size
+                                radius: [26, 26, 26, 26]
+                            Color:
+                                rgba: 0.88, 0.92, 0.9, 1
+                            Line:
+                                rounded_rectangle: [self.x, self.y, self.width, self.height, 26]
+                                width: 1.1
+
+                        Label:
+                            text: "Expense Details"
+                            size_hint_y: None
+                            height: "26dp"
+                            halign: "left"
+                            valign: "middle"
+                            text_size: self.width, self.height
+                            font_size: "21sp"
+                            bold: True
+                            color: 0.15, 0.18, 0.16, 1
+
+                        Label:
+                            text: "Fill the fields below and save when ready."
+                            size_hint_y: None
+                            height: "20dp"
+                            halign: "left"
+                            valign: "middle"
+                            text_size: self.width, self.height
+                            color: 0.48, 0.53, 0.5, 1
+
+                        Label:
+                            text: "Amount"
+                            size_hint_y: None
+                            height: "20dp"
+                            color: 0.31, 0.35, 0.33, 1
+                        TextInput:
+                            id: amount_input
+                            size_hint_y: None
+                            height: "52dp"
+                            multiline: False
+                            hint_text: "e.g. 245.50"
+                            input_filter: "float"
+                            background_normal: ""
+                            background_active: ""
+                            background_color: 0.96, 0.97, 0.96, 1
+                            foreground_color: 0.14, 0.18, 0.16, 1
+                            cursor_color: 0.18, 0.5, 0.32, 1
+                            padding: "16dp", "15dp"
+
+                        Label:
+                            text: "Merchant"
+                            size_hint_y: None
+                            height: "20dp"
+                            color: 0.31, 0.35, 0.33, 1
+                        TextInput:
+                            id: merchant_input
+                            size_hint_y: None
+                            height: "52dp"
+                            multiline: False
+                            hint_text: "Where did you spend?"
+                            background_normal: ""
+                            background_active: ""
+                            background_color: 0.96, 0.97, 0.96, 1
+                            foreground_color: 0.14, 0.18, 0.16, 1
+                            cursor_color: 0.18, 0.5, 0.32, 1
+                            padding: "16dp", "15dp"
+
+                        Label:
+                            text: "Payment Method"
+                            size_hint_y: None
+                            height: "20dp"
+                            color: 0.31, 0.35, 0.33, 1
+                        Spinner:
+                            id: payment_method_input
+                            size_hint_y: None
+                            height: "52dp"
+                            text: "UPI"
+                            values: ["UPI", "Card", "Cash", "Net Banking", "Wallet", "Other"]
+                            background_normal: ""
+                            background_color: 0.2, 0.22, 0.21, 1
+                            color: 1, 1, 1, 1
+
+                        Label:
+                            text: "Date"
+                            size_hint_y: None
+                            height: "20dp"
+                            color: 0.31, 0.35, 0.33, 1
+                        Button:
+                            id: date_button
+                            size_hint_y: None
+                            height: "52dp"
+                            text: root.default_date
+                            background_normal: ""
+                            background_down: ""
+                            background_color: 0.96, 0.97, 0.96, 1
+                            color: 0.14, 0.18, 0.16, 1
+                            on_release: root.open_date_picker()
+
+                        Label:
+                            text: "Notes"
+                            size_hint_y: None
+                            height: "20dp"
+                            color: 0.31, 0.35, 0.33, 1
+                        TextInput:
+                            id: notes_input
+                            size_hint_y: None
+                            height: "118dp"
+                            hint_text: "Optional details"
+                            background_normal: ""
+                            background_active: ""
+                            background_color: 0.96, 0.97, 0.96, 1
+                            foreground_color: 0.14, 0.18, 0.16, 1
+                            cursor_color: 0.18, 0.5, 0.32, 1
+                            padding: "16dp", "15dp"
+
+                    BoxLayout:
+                        size_hint_y: None
+                        height: "54dp"
+                        padding: "18dp", 0
+                        spacing: "12dp"
+
+                        Button:
+                            text: "Cancel"
+                            background_normal: ""
+                            background_down: ""
+                            background_color: 0.46, 0.51, 0.49, 1
+                            color: 1, 1, 1, 1
+                            on_release: root.cancel()
+
+                        Button:
+                            text: root.action_button_text
+                            background_normal: ""
+                            background_down: ""
+                            background_color: 0.21, 0.56, 0.39, 1
+                            color: 1, 1, 1, 1
+                            bold: True
+                            on_release: root.save_expense()
 
 <ExpenseRoot>:
 """
@@ -264,7 +519,11 @@ KV = """
 
 class ExpenseRow(BoxLayout):
     expense_id = NumericProperty(0)
-    summary_text = StringProperty("")
+    merchant_text = StringProperty("")
+    note_text = StringProperty("")
+    amount_text = StringProperty("")
+    date_text = StringProperty("")
+    method_text = StringProperty("")
     list_screen = ObjectProperty(allownone=True)
 
     def open_actions(self, _anchor: Button) -> None:
@@ -495,6 +754,9 @@ class ExpenseListScreen(Screen):
     repository = ObjectProperty(allownone=False)
     status_message = StringProperty("Review saved expenses or add a new one.")
     status_color = ListProperty([0.13, 0.42, 0.23, 1])
+    total_amount_text = StringProperty("Rs. 0.00")
+    expense_count_text = StringProperty("0")
+    status_is_error = NumericProperty(0)
 
     def on_pre_enter(self, *args) -> None:
         self.refresh_expenses()
@@ -504,28 +766,47 @@ class ExpenseListScreen(Screen):
         container = self.ids.list_container
         container.clear_widgets()
         expenses = self.repository.list_expenses()
+        total_amount = sum(expense.amount for expense in expenses)
+        self.total_amount_text = f"Rs. {total_amount:,.2f}"
+        self.expense_count_text = str(len(expenses))
 
         if not expenses:
+            empty_label = Label(
+                text="No expenses yet. Add your first entry to start building your timeline.",
+                halign="center",
+                valign="middle",
+                color=(0.28, 0.32, 0.3, 1),
+            )
+            empty_label.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width - 24, None)))
             container.add_widget(
-                Label(
-                    text="No expenses saved yet.",
+                BoxLayout(
                     size_hint_y=None,
-                    height=40,
-                    color=(0.22, 0.25, 0.24, 1),
+                    height=180,
                 )
             )
+            empty_state = container.children[0]
+            empty_state.padding = 18
+            empty_state.canvas.before.clear()
+            with empty_state.canvas.before:
+                from kivy.graphics import Color, RoundedRectangle
+                Color(1, 1, 1, 1)
+                RoundedRectangle(pos=empty_state.pos, size=empty_state.size, radius=[24, 24, 24, 24])
+            empty_state.bind(
+                pos=lambda instance, _value: self._refresh_empty_card(instance),
+                size=lambda instance, _value: self._refresh_empty_card(instance),
+            )
+            empty_state.add_widget(empty_label)
             return
 
         for expense in expenses:
-            notes_line = f"\n{expense.notes}" if expense.notes else ""
-            summary = (
-                f"{expense.expense_date}  |  Rs. {expense.amount:.2f}\n"
-                f"{expense.merchant} via {expense.payment_method}{notes_line}"
-            )
             container.add_widget(
                 ExpenseRow(
                     expense_id=expense.id or 0,
-                    summary_text=summary,
+                    merchant_text=expense.merchant,
+                    note_text=expense.notes,
+                    amount_text=f"Rs. {expense.amount:.2f}",
+                    date_text=expense.expense_date,
+                    method_text=expense.payment_method,
                     list_screen=self,
                 )
             )
@@ -601,6 +882,15 @@ class ExpenseListScreen(Screen):
     def _set_status(self, message: str, *, is_error: bool) -> None:
         self.status_message = message
         self.status_color = [0.78, 0.24, 0.18, 1] if is_error else [0.13, 0.42, 0.23, 1]
+        self.status_is_error = 1 if is_error else 0
+
+    def _refresh_empty_card(self, instance: BoxLayout) -> None:
+        from kivy.graphics import Color, RoundedRectangle
+
+        instance.canvas.before.clear()
+        with instance.canvas.before:
+            Color(1, 1, 1, 1)
+            RoundedRectangle(pos=instance.pos, size=instance.size, radius=[24, 24, 24, 24])
 
 
 class ExpenseEditScreen(Screen):
