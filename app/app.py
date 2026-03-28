@@ -585,6 +585,156 @@ KV = """
                             bold: True
                             on_release: root.save_expense()
 
+<VisualizationScreen>:
+    name: "visualization"
+    BoxLayout:
+        orientation: "vertical"
+        canvas.before:
+            Color:
+                rgba: 0.97, 0.95, 0.91, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_y: None
+            height: "184dp"
+            padding: "18dp"
+            spacing: "12dp"
+            canvas.before:
+                Color:
+                    rgba: 0.14, 0.35, 0.27, 1
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [0, 0, 30, 30]
+
+            Button:
+                text: "< Back"
+                size_hint: None, None
+                size: "88dp", "34dp"
+                background_normal: ""
+                background_down: ""
+                background_color: 0.22, 0.48, 0.39, 1
+                color: 1, 1, 1, 1
+                on_release: root.go_back()
+
+            Label:
+                text: "Spend Visualization"
+                size_hint_y: None
+                height: "38dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                font_size: "30sp"
+                bold: True
+                color: 1, 1, 1, 1
+
+            Label:
+                text: "Review monthly and yearly spend trends with a full-size chart."
+                size_hint_y: None
+                height: "40dp"
+                halign: "left"
+                valign: "top"
+                text_size: self.width, None
+                color: 0.84, 0.93, 0.89, 1
+
+        BoxLayout:
+            orientation: "vertical"
+            padding: "18dp"
+            spacing: "14dp"
+
+            BoxLayout:
+                size_hint_y: None
+                height: "48dp"
+                spacing: "10dp"
+
+                Button:
+                    id: monthly_button
+                    text: "Monthly"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.21, 0.56, 0.39, 1
+                    color: 1, 1, 1, 1
+                    bold: True
+                    on_release: root.set_mode("monthly")
+
+                Button:
+                    id: yearly_button
+                    text: "Yearly"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.9, 0.93, 0.91, 1
+                    color: 0.14, 0.18, 0.16, 1
+                    bold: True
+                    on_release: root.set_mode("yearly")
+
+            BoxLayout:
+                id: selector_row
+                size_hint_y: None
+                height: "46dp"
+                spacing: "10dp"
+
+                Label:
+                    text: "Year"
+                    size_hint_x: None
+                    width: "52dp"
+                    halign: "left"
+                    valign: "middle"
+                    text_size: self.size
+                    color: 0.24, 0.28, 0.26, 1
+
+                Spinner:
+                    id: year_spinner
+                    text: root.selected_year_text
+                    values: root.year_values
+                    background_normal: ""
+                    background_color: 0.95, 0.96, 0.95, 1
+                    color: 0.14, 0.18, 0.16, 1
+                    on_text: root.on_year_selected(self.text)
+
+            Label:
+                id: chart_caption
+                text: root.chart_caption
+                size_hint_y: None
+                height: "26dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                font_size: "18sp"
+                bold: True
+                color: 0.15, 0.18, 0.16, 1
+
+            BoxLayout:
+                orientation: "vertical"
+                canvas.before:
+                    Color:
+                        rgba: 1, 1, 1, 1
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [26, 26, 26, 26]
+                    Color:
+                        rgba: 0.88, 0.92, 0.9, 1
+                    Line:
+                        rounded_rectangle: [self.x, self.y, self.width, self.height, 26]
+                        width: 1.1
+
+                ScrollView:
+                    do_scroll_x: True
+                    do_scroll_y: False
+                    bar_width: "4dp"
+
+                    BoxLayout:
+                        id: chart_anchor
+                        orientation: "vertical"
+                        size_hint_x: None
+                        size_hint_y: None
+                        width: max(self.minimum_width, self.parent.width if self.parent else 0)
+                        height: max(self.minimum_height, dp(360))
+                        padding: "16dp"
+
 <ExpenseRoot>:
 """
 
@@ -1052,271 +1202,9 @@ class ExpenseListScreen(Screen):
         return expenses
 
     def open_visualization(self) -> None:
-        expenses = self.repository.list_expenses(limit=None)
-        if not expenses:
-            self._set_status("Add expenses to view visualization.", is_error=True)
-            return
-
-        modal = ModalView(
-            auto_dismiss=True,
-            size_hint=(1, 1),
-            background_color=(0.08, 0.1, 0.09, 0.45),
-        )
-        outer = AnchorLayout(anchor_x="center", anchor_y="center", padding=dp(20))
-        card = BoxLayout(
-            orientation="vertical",
-            size_hint=(None, None),
-            size=(dp(342), dp(560)),
-            spacing=dp(14),
-            padding=dp(18),
-        )
-
-        def redraw_card(instance: BoxLayout, _value) -> None:
-            from kivy.graphics import Color, RoundedRectangle
-
-            instance.canvas.before.clear()
-            with instance.canvas.before:
-                Color(0.99, 0.98, 0.96, 1)
-                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[24, 24, 24, 24])
-
-        card.bind(pos=redraw_card, size=redraw_card)
-        redraw_card(card, None)
-
-        header = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(10))
-        title = Label(
-            text="Spend Visualization",
-            halign="left",
-            valign="middle",
-            bold=True,
-            color=(0.14, 0.18, 0.16, 1),
-            font_size="20sp",
-        )
-        title.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        close_button = Button(
-            text="X",
-            size_hint=(None, None),
-            size=(dp(38), dp(38)),
-            background_normal="",
-            background_down="",
-            background_color=(0.92, 0.94, 0.93, 1),
-            color=(0.22, 0.26, 0.24, 1),
-        )
-        header.add_widget(title)
-        header.add_widget(close_button)
-        card.add_widget(header)
-
-        description = Label(
-            text="Switch between monthly and yearly spend trends.",
-            size_hint_y=None,
-            height=dp(42),
-            halign="left",
-            valign="top",
-            color=(0.47, 0.52, 0.49, 1),
-        )
-        description.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, None)))
-        card.add_widget(description)
-
-        toggle_row = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
-        monthly_button = Button(
-            text="Monthly",
-            background_normal="",
-            background_down="",
-            background_color=(0.21, 0.56, 0.39, 1),
-            color=(1, 1, 1, 1),
-            bold=True,
-        )
-        yearly_button = Button(
-            text="Yearly",
-            background_normal="",
-            background_down="",
-            background_color=(0.9, 0.93, 0.91, 1),
-            color=(0.14, 0.18, 0.16, 1),
-            bold=True,
-        )
-        toggle_row.add_widget(monthly_button)
-        toggle_row.add_widget(yearly_button)
-        card.add_widget(toggle_row)
-
-        available_years = sorted({expense.expense_date[:4] for expense in expenses}, reverse=True)
-        selector_row = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(10))
-        selector_label = Label(
-            text="Year",
-            size_hint_x=None,
-            width=dp(52),
-            halign="left",
-            valign="middle",
-            color=(0.24, 0.28, 0.26, 1),
-        )
-        selector_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        year_spinner = Spinner(
-            text=available_years[0],
-            values=available_years,
-            background_normal="",
-            background_color=(0.95, 0.96, 0.95, 1),
-            color=(0.14, 0.18, 0.16, 1),
-        )
-        selector_row.add_widget(selector_label)
-        selector_row.add_widget(year_spinner)
-        card.add_widget(selector_row)
-
-        chart_host = BoxLayout(orientation="vertical")
-        card.add_widget(chart_host)
-        current_mode = {"value": "monthly"}
-
-        def render_chart(mode: str) -> None:
-            current_mode["value"] = mode
-            monthly_button.background_color = (0.21, 0.56, 0.39, 1) if mode == "monthly" else (0.9, 0.93, 0.91, 1)
-            monthly_button.color = (1, 1, 1, 1) if mode == "monthly" else (0.14, 0.18, 0.16, 1)
-            yearly_button.background_color = (0.21, 0.56, 0.39, 1) if mode == "yearly" else (0.9, 0.93, 0.91, 1)
-            yearly_button.color = (1, 1, 1, 1) if mode == "yearly" else (0.14, 0.18, 0.16, 1)
-            selector_row.opacity = 1 if mode == "monthly" else 0
-            selector_row.height = dp(46) if mode == "monthly" else 0
-            chart_host.clear_widgets()
-            chart_host.add_widget(self._build_visual_chart(expenses, mode, year_spinner.text))
-
-        monthly_button.bind(on_release=lambda _instance: render_chart("monthly"))
-        yearly_button.bind(on_release=lambda _instance: render_chart("yearly"))
-        year_spinner.bind(text=lambda _spinner, _text: render_chart("monthly") if current_mode["value"] == "monthly" else None)
-        close_button.bind(on_release=lambda _instance: modal.dismiss())
-        render_chart("monthly")
-
-        outer.add_widget(card)
-        modal.add_widget(outer)
-        modal.open()
-
-    def _build_visual_chart(self, expenses: list[ExpenseRecord], mode: str, selected_year: str) -> BoxLayout:
-        labels, values, caption = self._build_chart_series(expenses, mode, selected_year)
-        chart = BoxLayout(orientation="vertical", spacing=dp(10))
-
-        caption_label = Label(
-            text=caption,
-            size_hint_y=None,
-            height=dp(22),
-            halign="left",
-            valign="middle",
-            color=(0.24, 0.28, 0.26, 1),
-            bold=True,
-        )
-        caption_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        chart.add_widget(caption_label)
-
-        body = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(300), spacing=dp(8))
-        y_axis = BoxLayout(orientation="vertical", size_hint_x=None, width=dp(44))
-
-        max_value = max(values) if values else 1.0
-        if max_value <= 0:
-            max_value = 1.0
-        tick_values = [max_value * ratio for ratio in (1, 0.75, 0.5, 0.25, 0)]
-        for tick in tick_values:
-            tick_label = Label(
-                text=f"{int(round(tick))}",
-                halign="right",
-                valign="middle",
-                color=(0.43, 0.47, 0.45, 1),
-                font_size="11sp",
-            )
-            tick_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-            y_axis.add_widget(tick_label)
-        body.add_widget(y_axis)
-
-        plot = BoxLayout(orientation="vertical")
-
-        def redraw_plot(instance: BoxLayout, _value) -> None:
-            from kivy.graphics import Color, Line
-
-            instance.canvas.before.clear()
-            with instance.canvas.before:
-                Color(0.64, 0.28, 0.67, 1)
-                Line(points=[instance.x, instance.y, instance.x, instance.top], width=1.2)
-                Line(points=[instance.x, instance.y, instance.right, instance.y], width=1.2)
-
-        plot.bind(pos=redraw_plot, size=redraw_plot)
-        redraw_plot(plot, None)
-
-        bars_anchor = AnchorLayout(anchor_x="center", anchor_y="bottom")
-        bar_width = dp(14) if len(labels) > 8 else dp(18)
-        bar_spacing = dp(4) if len(labels) > 8 else dp(8)
-        bars_row = BoxLayout(
-            orientation="horizontal",
-            size_hint=(None, None),
-            size=(max(dp(250), len(labels) * (bar_width + bar_spacing)), dp(230)),
-            spacing=bar_spacing,
-            padding=(dp(6), 0, dp(6), 0),
-        )
-        for label_text, amount in zip(labels, values):
-            bars_row.add_widget(self._build_bar_column(label_text, amount, max_value, bar_width))
-        bars_anchor.add_widget(bars_row)
-        plot.add_widget(bars_anchor)
-        body.add_widget(plot)
-        chart.add_widget(body)
-
-        return chart
-
-    def _build_chart_series(
-        self,
-        expenses: list[ExpenseRecord],
-        mode: str,
-        selected_year: str,
-    ) -> tuple[list[str], list[float], str]:
-        if mode == "yearly":
-            totals: defaultdict[str, float] = defaultdict(float)
-            for expense in expenses:
-                totals[expense.expense_date[:4]] += expense.amount
-            years = sorted(totals.keys())
-            return years, [totals[year] for year in years], "Yearly spend overview"
-
-        totals = {month: 0.0 for month in range(1, 13)}
-        for expense in expenses:
-            if expense.expense_date.startswith(selected_year):
-                totals[int(expense.expense_date[5:7])] += expense.amount
-        labels = list(calendar.month_abbr)[1:]
-        values = [totals[month] for month in range(1, 13)]
-        return labels, values, f"Monthly spend for {selected_year}"
-
-    def _build_bar_column(self, label_text: str, amount: float, max_value: float, bar_width: float) -> BoxLayout:
-        column = BoxLayout(orientation="vertical", spacing=dp(6))
-
-        value_label = Label(
-            text=f"{int(round(amount))}" if amount else "0",
-            size_hint_y=None,
-            height=dp(18),
-            halign="center",
-            valign="middle",
-            color=(0.33, 0.37, 0.35, 1),
-            font_size="10sp",
-        )
-        value_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        column.add_widget(value_label)
-
-        bar_area = AnchorLayout(anchor_x="center", anchor_y="bottom", size_hint_y=None, height=dp(190))
-        bar_height = dp(12) if amount <= 0 else max(dp(18), dp(160) * (amount / max_value))
-        bar = Widget(size_hint=(None, None), size=(bar_width, bar_height))
-
-        def redraw_bar(instance: Widget, _value) -> None:
-            from kivy.graphics import Color, RoundedRectangle
-
-            instance.canvas.before.clear()
-            with instance.canvas.before:
-                Color(0.1, 0.77, 0.79, 1)
-                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[6, 6, 0, 0])
-
-        bar.bind(pos=redraw_bar, size=redraw_bar)
-        redraw_bar(bar, None)
-        bar_area.add_widget(bar)
-        column.add_widget(bar_area)
-
-        label = Label(
-            text=label_text,
-            size_hint_y=None,
-            height=dp(18),
-            halign="center",
-            valign="middle",
-            color=(0.43, 0.18, 0.48, 1),
-            font_size="11sp",
-        )
-        label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        column.add_widget(label)
-        return column
+        visualization_screen = self.manager.get_screen("visualization")
+        visualization_screen.prepare_visualization()
+        self.manager.current = "visualization"
 
     def _refresh_empty_card(self, instance: BoxLayout) -> None:
         from kivy.graphics import Color, RoundedRectangle
@@ -1447,6 +1335,198 @@ class ExpenseListScreen(Screen):
         return row
 
 
+class VisualizationScreen(Screen):
+    repository = ObjectProperty(allownone=False)
+    chart_mode = StringProperty("monthly")
+    selected_year_text = StringProperty("")
+    chart_caption = StringProperty("Monthly spend")
+    year_values = ListProperty([])
+
+    def prepare_visualization(self) -> None:
+        expenses = self.repository.list_expenses(limit=None)
+        years = sorted({expense.expense_date[:4] for expense in expenses}, reverse=True)
+        self.year_values = years or [str(date.today().year)]
+        if self.selected_year_text not in self.year_values:
+            self.selected_year_text = self.year_values[0]
+        self.chart_mode = "monthly"
+        self._sync_controls()
+        self.refresh_chart()
+
+    def on_pre_enter(self, *args) -> None:
+        self._sync_controls()
+        if self.repository.list_expenses(limit=None):
+            self.refresh_chart()
+        return super().on_pre_enter(*args)
+
+    def set_mode(self, mode: str) -> None:
+        if mode not in {"monthly", "yearly"}:
+            return
+        self.chart_mode = mode
+        self._sync_controls()
+        self.refresh_chart()
+
+    def on_year_selected(self, year_text: str) -> None:
+        self.selected_year_text = year_text
+        if self.chart_mode == "monthly":
+            self.refresh_chart()
+
+    def go_back(self) -> None:
+        self.manager.current = "list"
+
+    def refresh_chart(self) -> None:
+        chart_anchor = self.ids.chart_anchor
+        chart_anchor.clear_widgets()
+        expenses = self.repository.list_expenses(limit=None)
+        if not expenses:
+            placeholder = Label(
+                text="Add expenses to see visualization.",
+                halign="center",
+                valign="middle",
+                color=(0.32, 0.36, 0.34, 1),
+            )
+            placeholder.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+            chart_anchor.add_widget(placeholder)
+            return
+
+        labels, values, caption = self._build_chart_series(expenses, self.chart_mode, self.selected_year_text)
+        self.chart_caption = caption
+        chart_anchor.add_widget(self._build_visual_chart(labels, values))
+
+    def _sync_controls(self) -> None:
+        self.ids.monthly_button.background_color = (0.21, 0.56, 0.39, 1) if self.chart_mode == "monthly" else (0.9, 0.93, 0.91, 1)
+        self.ids.monthly_button.color = (1, 1, 1, 1) if self.chart_mode == "monthly" else (0.14, 0.18, 0.16, 1)
+        self.ids.yearly_button.background_color = (0.21, 0.56, 0.39, 1) if self.chart_mode == "yearly" else (0.9, 0.93, 0.91, 1)
+        self.ids.yearly_button.color = (1, 1, 1, 1) if self.chart_mode == "yearly" else (0.14, 0.18, 0.16, 1)
+        self.ids.selector_row.height = dp(46) if self.chart_mode == "monthly" else 0
+        self.ids.selector_row.opacity = 1 if self.chart_mode == "monthly" else 0
+        self.ids.year_spinner.text = self.selected_year_text
+        self.ids.year_spinner.values = self.year_values
+
+    def _build_chart_series(
+        self,
+        expenses: list[ExpenseRecord],
+        mode: str,
+        selected_year: str,
+    ) -> tuple[list[str], list[float], str]:
+        if mode == "yearly":
+            totals: defaultdict[str, float] = defaultdict(float)
+            for expense in expenses:
+                totals[expense.expense_date[:4]] += expense.amount
+            years = sorted(totals.keys())
+            return years, [totals[year] for year in years], "Yearly spend overview"
+
+        totals = {month: 0.0 for month in range(1, 13)}
+        for expense in expenses:
+            if expense.expense_date.startswith(selected_year):
+                totals[int(expense.expense_date[5:7])] += expense.amount
+        labels = list(calendar.month_abbr)[1:]
+        values = [totals[month] for month in range(1, 13)]
+        return labels, values, f"Monthly spend for {selected_year}"
+
+    def _build_visual_chart(self, labels: list[str], values: list[float]) -> BoxLayout:
+        chart = BoxLayout(
+            orientation="vertical",
+            spacing=dp(8),
+            size_hint=(None, None),
+            size=(max(dp(640), len(labels) * dp(54)), dp(360)),
+        )
+
+        body = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(310), spacing=dp(8))
+        y_axis = BoxLayout(orientation="vertical", size_hint_x=None, width=dp(56))
+
+        max_value = max(values) if values else 1.0
+        if max_value <= 0:
+            max_value = 1.0
+        tick_values = [max_value * ratio for ratio in (1, 0.75, 0.5, 0.25, 0)]
+        for tick in tick_values:
+            tick_label = Label(
+                text=f"{int(round(tick))}",
+                halign="right",
+                valign="middle",
+                color=(0.43, 0.47, 0.45, 1),
+                font_size="12sp",
+            )
+            tick_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+            y_axis.add_widget(tick_label)
+        body.add_widget(y_axis)
+
+        plot = BoxLayout(orientation="vertical")
+
+        def redraw_plot(instance: BoxLayout, _value) -> None:
+            from kivy.graphics import Color, Line
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(0.64, 0.28, 0.67, 1)
+                Line(points=[instance.x, instance.y, instance.x, instance.top], width=1.5)
+                Line(points=[instance.x, instance.y, instance.right, instance.y], width=1.5)
+
+        plot.bind(pos=redraw_plot, size=redraw_plot)
+        redraw_plot(plot, None)
+
+        bars_anchor = AnchorLayout(anchor_x="center", anchor_y="bottom")
+        bars_row = BoxLayout(
+            orientation="horizontal",
+            size_hint=(None, None),
+            size=(max(dp(560), len(labels) * dp(46)), dp(250)),
+            spacing=dp(8),
+            padding=(dp(6), 0, dp(6), 0),
+        )
+        for label_text, amount in zip(labels, values):
+            bars_row.add_widget(self._build_bar_column(label_text, amount, max_value))
+        bars_anchor.add_widget(bars_row)
+        plot.add_widget(bars_anchor)
+        body.add_widget(plot)
+        chart.add_widget(body)
+
+        return chart
+
+    def _build_bar_column(self, label_text: str, amount: float, max_value: float) -> BoxLayout:
+        column = BoxLayout(orientation="vertical", spacing=dp(8), size_hint_x=None, width=dp(38))
+
+        value_label = Label(
+            text=f"{int(round(amount))}" if amount else "0",
+            size_hint_y=None,
+            height=dp(18),
+            halign="center",
+            valign="middle",
+            color=(0.33, 0.37, 0.35, 1),
+            font_size="10sp",
+        )
+        value_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        column.add_widget(value_label)
+
+        bar_area = AnchorLayout(anchor_x="center", anchor_y="bottom", size_hint_y=None, height=dp(190))
+        bar_height = dp(12) if amount <= 0 else max(dp(18), dp(170) * (amount / max_value))
+        bar = Widget(size_hint=(None, None), size=(dp(22), bar_height))
+
+        def redraw_bar(instance: Widget, _value) -> None:
+            from kivy.graphics import Color, RoundedRectangle
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(0.1, 0.77, 0.79, 1)
+                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[6, 6, 0, 0])
+
+        bar.bind(pos=redraw_bar, size=redraw_bar)
+        redraw_bar(bar, None)
+        bar_area.add_widget(bar)
+        column.add_widget(bar_area)
+
+        label = Label(
+            text=label_text,
+            size_hint_y=None,
+            height=dp(20),
+            halign="center",
+            valign="middle",
+            color=(0.43, 0.18, 0.48, 1),
+            font_size="11sp",
+        )
+        label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        column.add_widget(label)
+        return column
+
+
 class ExpenseEditScreen(Screen):
     repository = ObjectProperty(allownone=False)
     expense_id = ObjectProperty(allownone=True)
@@ -1575,6 +1655,7 @@ class ExpenseTrackerApp(App):
             root = ExpenseRoot(repository=repository)
             root.add_widget(ExpenseListScreen(repository=repository))
             root.add_widget(ExpenseEditScreen(repository=repository))
+            root.add_widget(VisualizationScreen(repository=repository))
             root.current = "list"
             return root
         except Exception:
