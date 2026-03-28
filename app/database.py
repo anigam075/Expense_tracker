@@ -128,17 +128,26 @@ class ExpenseRepository:
         if cursor.rowcount == 0:
             raise ValueError(f"Expense with id {expense_id} was not found.")
 
-    def list_expenses(self, limit: int = 100) -> list[ExpenseRecord]:
+    def list_expenses(self, limit: int | None = 100) -> list[ExpenseRecord]:
         with self._connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT id, amount, merchant, payment_method, expense_date, notes, source
-                FROM expenses
-                ORDER BY expense_date DESC, id DESC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
+            if limit is None:
+                rows = connection.execute(
+                    """
+                    SELECT id, amount, merchant, payment_method, expense_date, notes, source
+                    FROM expenses
+                    ORDER BY expense_date DESC, id DESC
+                    """
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT id, amount, merchant, payment_method, expense_date, notes, source
+                    FROM expenses
+                    ORDER BY expense_date DESC, id DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
 
         return [self._row_to_record(row) for row in rows]
 

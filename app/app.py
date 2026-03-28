@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import calendar
+from collections import defaultdict
 import tempfile
 import traceback
 from datetime import date
@@ -18,6 +19,8 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.modalview import ModalView
 from kivy.uix.popup import Popup
+from kivy.uix.progressbar import ProgressBar
+from kivy.uix.scrollview import ScrollView
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.spinner import Spinner
 
@@ -155,7 +158,7 @@ KV = """
         BoxLayout:
             orientation: "vertical"
             size_hint_y: None
-            height: "258dp"
+            height: "322dp"
             padding: "18dp"
             spacing: "14dp"
             canvas.before:
@@ -246,6 +249,17 @@ KV = """
                         bold: True
                         color: 1, 1, 1, 1
 
+            Button:
+                text: "View Visualization"
+                size_hint_y: None
+                height: "46dp"
+                background_normal: ""
+                background_down: ""
+                background_color: 0.84, 0.92, 0.88, 1
+                color: 0.13, 0.24, 0.19, 1
+                bold: True
+                on_release: root.open_visualization()
+
             Label:
                 text: root.status_message
                 size_hint_y: None
@@ -284,6 +298,53 @@ KV = """
                     color: 1, 1, 1, 1
                     bold: True
                     on_release: root.add_expense()
+
+            TextInput:
+                id: search_input
+                size_hint_y: None
+                height: "48dp"
+                multiline: False
+                hint_text: "Search merchant or notes"
+                background_normal: ""
+                background_active: ""
+                background_color: 1, 1, 1, 1
+                foreground_color: 0.15, 0.18, 0.16, 1
+                cursor_color: 0.18, 0.5, 0.32, 1
+                padding: "14dp", "14dp"
+                on_text: root.refresh_expenses()
+
+            BoxLayout:
+                size_hint_y: None
+                height: "48dp"
+                spacing: "10dp"
+
+                Spinner:
+                    id: payment_filter_input
+                    text: "All Methods"
+                    values: ["All Methods", "UPI", "Card", "Cash", "Net Banking", "Wallet", "Other"]
+                    background_normal: ""
+                    background_color: 1, 1, 1, 1
+                    color: 0.15, 0.18, 0.16, 1
+                    on_text: root.refresh_expenses()
+
+                Spinner:
+                    id: sort_input
+                    text: "Newest"
+                    values: ["Newest", "Oldest", "Amount High-Low", "Amount Low-High", "Merchant A-Z"]
+                    background_normal: ""
+                    background_color: 1, 1, 1, 1
+                    color: 0.15, 0.18, 0.16, 1
+                    on_text: root.refresh_expenses()
+
+                Button:
+                    text: "Clear"
+                    size_hint_x: None
+                    width: "84dp"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.46, 0.51, 0.49, 1
+                    color: 1, 1, 1, 1
+                    on_release: root.clear_filters()
 
             ScrollView:
                 do_scroll_x: False
@@ -819,7 +880,7 @@ class ExpenseListScreen(Screen):
     def refresh_expenses(self) -> None:
         container = self.ids.list_container
         container.clear_widgets()
-        expenses = self.repository.list_expenses()
+        expenses = self._get_visible_expenses()
         total_amount = sum(expense.amount for expense in expenses)
         self.total_amount_text = f"Rs. {total_amount:,.2f}"
         self.expense_count_text = str(len(expenses))
@@ -864,6 +925,12 @@ class ExpenseListScreen(Screen):
                     list_screen=self,
                 )
             )
+
+    def clear_filters(self) -> None:
+        self.ids.search_input.text = ""
+        self.ids.payment_filter_input.text = "All Methods"
+        self.ids.sort_input.text = "Newest"
+        self.refresh_expenses()
 
     def add_expense(self) -> None:
         edit_screen = self.manager.get_screen("edit")
@@ -915,23 +982,27 @@ class ExpenseListScreen(Screen):
                 color=(0.15, 0.18, 0.16, 1),
             )
         )
-        buttons = BoxLayout(size_hint_y=None, height=48, spacing=10)
+        buttons = BoxLayout(size_hint_y=None, height=58, spacing=10)
         popup = Popup(
             title="Delete Expense",
             content=content,
             size_hint=(0.85, None),
-            height=220,
+            height=238,
             auto_dismiss=False,
         )
         no_button = Button(
             text="No",
             background_normal="",
             background_color=(0.4, 0.45, 0.43, 1),
+            size_hint_y=None,
+            height=58,
         )
         yes_button = Button(
             text="Yes",
             background_normal="",
             background_color=(0.68, 0.24, 0.2, 1),
+            size_hint_y=None,
+            height=58,
         )
         no_button.bind(on_release=lambda _instance: popup.dismiss())
         yes_button.bind(on_release=lambda _instance: self._delete_expense(expense, popup))
@@ -950,6 +1021,194 @@ class ExpenseListScreen(Screen):
         self.status_message = message
         self.status_color = [0.78, 0.24, 0.18, 1] if is_error else [0.13, 0.42, 0.23, 1]
         self.status_is_error = 1 if is_error else 0
+
+    def _get_visible_expenses(self) -> list[ExpenseRecord]:
+        expenses = self.repository.list_expenses(limit=None)
+        search_text = self.ids.search_input.text.strip().lower() if "search_input" in self.ids else ""
+        payment_method = self.ids.payment_filter_input.text if "payment_filter_input" in self.ids else "All Methods"
+        sort_option = self.ids.sort_input.text if "sort_input" in self.ids else "Newest"
+
+        if search_text:
+            expenses = [
+                expense
+                for expense in expenses
+                if search_text in expense.merchant.lower() or search_text in expense.notes.lower()
+            ]
+
+        if payment_method != "All Methods":
+            expenses = [expense for expense in expenses if expense.payment_method == payment_method]
+
+        if sort_option == "Oldest":
+            expenses.sort(key=lambda expense: (expense.expense_date, expense.id or 0))
+        elif sort_option == "Amount High-Low":
+            expenses.sort(key=lambda expense: (-expense.amount, expense.expense_date), reverse=False)
+        elif sort_option == "Amount Low-High":
+            expenses.sort(key=lambda expense: (expense.amount, expense.expense_date))
+        elif sort_option == "Merchant A-Z":
+            expenses.sort(key=lambda expense: (expense.merchant.lower(), expense.expense_date), reverse=False)
+        else:
+            expenses.sort(key=lambda expense: (expense.expense_date, expense.id or 0), reverse=True)
+
+        return expenses
+
+    def open_visualization(self) -> None:
+        expenses = self.repository.list_expenses(limit=None)
+        if not expenses:
+            self._set_status("Add expenses to view visualization.", is_error=True)
+            return
+
+        modal = ModalView(
+            auto_dismiss=True,
+            size_hint=(1, 1),
+            background_color=(0.08, 0.1, 0.09, 0.45),
+        )
+        outer = AnchorLayout(anchor_x="center", anchor_y="center", padding=dp(20))
+        card = BoxLayout(
+            orientation="vertical",
+            size_hint=(None, None),
+            size=(dp(330), dp(520)),
+            spacing=dp(14),
+            padding=dp(18),
+        )
+
+        def redraw_card(instance: BoxLayout, _value) -> None:
+            from kivy.graphics import Color, RoundedRectangle
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(0.99, 0.98, 0.96, 1)
+                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[24, 24, 24, 24])
+
+        card.bind(pos=redraw_card, size=redraw_card)
+        redraw_card(card, None)
+
+        header = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(10))
+        title = Label(
+            text="Spend Visualization",
+            halign="left",
+            valign="middle",
+            bold=True,
+            color=(0.14, 0.18, 0.16, 1),
+            font_size="20sp",
+        )
+        title.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        close_button = Button(
+            text="X",
+            size_hint=(None, None),
+            size=(dp(38), dp(38)),
+            background_normal="",
+            background_down="",
+            background_color=(0.92, 0.94, 0.93, 1),
+            color=(0.22, 0.26, 0.24, 1),
+        )
+        header.add_widget(title)
+        header.add_widget(close_button)
+        card.add_widget(header)
+
+        description = Label(
+            text="Switch between monthly and yearly spend trends.",
+            size_hint_y=None,
+            height=dp(24),
+            halign="left",
+            valign="middle",
+            color=(0.47, 0.52, 0.49, 1),
+        )
+        description.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        card.add_widget(description)
+
+        toggle_row = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
+        monthly_button = Button(
+            text="Monthly",
+            background_normal="",
+            background_down="",
+            background_color=(0.21, 0.56, 0.39, 1),
+            color=(1, 1, 1, 1),
+            bold=True,
+        )
+        yearly_button = Button(
+            text="Yearly",
+            background_normal="",
+            background_down="",
+            background_color=(0.9, 0.93, 0.91, 1),
+            color=(0.14, 0.18, 0.16, 1),
+            bold=True,
+        )
+        toggle_row.add_widget(monthly_button)
+        toggle_row.add_widget(yearly_button)
+        card.add_widget(toggle_row)
+
+        chart_scroll = ScrollView(do_scroll_x=False, bar_width=dp(4))
+        chart_container = BoxLayout(orientation="vertical", spacing=dp(10), size_hint_y=None, padding=(0, 0, 0, dp(10)))
+        chart_container.bind(minimum_height=chart_container.setter("height"))
+        chart_scroll.add_widget(chart_container)
+        card.add_widget(chart_scroll)
+
+        def render_chart(mode: str) -> None:
+            chart_container.clear_widgets()
+            series = self._build_series(expenses, mode)
+            if not series:
+                return
+
+            max_value = max(value for _, value in series) or 1.0
+            for label_text, amount in series:
+                chart_container.add_widget(self._build_chart_row(label_text, amount, max_value))
+
+            monthly_button.background_color = (0.21, 0.56, 0.39, 1) if mode == "monthly" else (0.9, 0.93, 0.91, 1)
+            monthly_button.color = (1, 1, 1, 1) if mode == "monthly" else (0.14, 0.18, 0.16, 1)
+            yearly_button.background_color = (0.21, 0.56, 0.39, 1) if mode == "yearly" else (0.9, 0.93, 0.91, 1)
+            yearly_button.color = (1, 1, 1, 1) if mode == "yearly" else (0.14, 0.18, 0.16, 1)
+
+        monthly_button.bind(on_release=lambda _instance: render_chart("monthly"))
+        yearly_button.bind(on_release=lambda _instance: render_chart("yearly"))
+        close_button.bind(on_release=lambda _instance: modal.dismiss())
+        render_chart("monthly")
+
+        outer.add_widget(card)
+        modal.add_widget(outer)
+        modal.open()
+
+    def _build_series(self, expenses: list[ExpenseRecord], mode: str) -> list[tuple[str, float]]:
+        totals: defaultdict[str, float] = defaultdict(float)
+        if mode == "yearly":
+            for expense in expenses:
+                year = expense.expense_date[:4]
+                totals[year] += expense.amount
+            return sorted(totals.items(), key=lambda item: item[0], reverse=True)[:8]
+
+        for expense in expenses:
+            month_key = expense.expense_date[:7]
+            totals[month_key] += expense.amount
+        return sorted(totals.items(), key=lambda item: item[0], reverse=True)[:8]
+
+    def _build_chart_row(self, label_text: str, amount: float, max_value: float) -> BoxLayout:
+        row = BoxLayout(orientation="vertical", spacing=dp(6), size_hint_y=None, height=dp(70))
+
+        header = BoxLayout(size_hint_y=None, height=dp(22))
+        label = Label(
+            text=label_text,
+            halign="left",
+            valign="middle",
+            color=(0.24, 0.28, 0.26, 1),
+        )
+        value = Label(
+            text=f"Rs. {amount:,.2f}",
+            halign="right",
+            valign="middle",
+            color=(0.14, 0.18, 0.16, 1),
+            bold=True,
+        )
+        label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        value.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        header.add_widget(label)
+        header.add_widget(value)
+
+        bar = ProgressBar(max=max_value, value=amount)
+        bar.size_hint_y = None
+        bar.height = dp(18)
+
+        row.add_widget(header)
+        row.add_widget(bar)
+        return row
 
     def _refresh_empty_card(self, instance: BoxLayout) -> None:
         from kivy.graphics import Color, RoundedRectangle
@@ -1121,13 +1380,13 @@ class ExpenseEditScreen(Screen):
 
     def save_expense(self) -> None:
         amount_text = self.ids.amount_input.text.strip()
-        merchant = self.ids.merchant_input.text.strip()
+        merchant = " ".join(self.ids.merchant_input.text.strip().split())
         payment_method = self.ids.payment_method_input.text.strip()
         expense_date = self.ids.date_button.text.strip()
-        notes = self.ids.notes_input.text.strip()
+        notes = " ".join(self.ids.notes_input.text.strip().split())
 
-        if not amount_text or not merchant or not expense_date:
-            self._set_feedback("Please enter amount, merchant, and date.", is_error=True)
+        if not amount_text or not merchant or not payment_method or not expense_date:
+            self._set_feedback("Please enter amount, merchant, payment method, and date.", is_error=True)
             return
 
         try:
