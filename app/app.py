@@ -9,11 +9,14 @@ from pathlib import Path
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.lang import Builder
+from kivy.metrics import dp
 from kivy.properties import ListProperty, NumericProperty, ObjectProperty, StringProperty
+from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
+from kivy.uix.modalview import ModalView
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.spinner import Spinner
@@ -950,7 +953,20 @@ class ExpenseListScreen(Screen):
             RoundedRectangle(pos=instance.pos, size=instance.size, radius=[24, 24, 24, 24])
 
     def _open_expense_detail_popup(self, expense: ExpenseRecord) -> None:
-        content = BoxLayout(orientation="vertical", spacing=14, padding=18)
+        modal = ModalView(
+            auto_dismiss=True,
+            size_hint=(1, 1),
+            background_color=(0.08, 0.1, 0.09, 0.45),
+        )
+
+        outer = AnchorLayout(anchor_x="center", anchor_y="center", padding=dp(24))
+        card = BoxLayout(
+            orientation="vertical",
+            size_hint=(None, None),
+            size=(dp(320), dp(420)),
+            spacing=dp(14),
+            padding=dp(18),
+        )
 
         def redraw_popup_card(instance: BoxLayout, _value) -> None:
             from kivy.graphics import Color, RoundedRectangle
@@ -960,8 +976,8 @@ class ExpenseListScreen(Screen):
                 Color(0.99, 0.98, 0.96, 1)
                 RoundedRectangle(pos=instance.pos, size=instance.size, radius=[24, 24, 24, 24])
 
-        content.bind(pos=redraw_popup_card, size=redraw_popup_card)
-        redraw_popup_card(content, None)
+        card.bind(pos=redraw_popup_card, size=redraw_popup_card)
+        redraw_popup_card(card, None)
 
         header = BoxLayout(size_hint_y=None, height=42, spacing=12)
         title = Label(
@@ -984,7 +1000,7 @@ class ExpenseListScreen(Screen):
         )
         header.add_widget(title)
         header.add_widget(close_button)
-        content.add_widget(header)
+        card.add_widget(header)
 
         field_container = BoxLayout(orientation="vertical", spacing=10)
         fields = [
@@ -998,29 +1014,20 @@ class ExpenseListScreen(Screen):
             field_container.add_widget(
                 self._build_detail_row(label_text, value_text, multiline=(label_text == "Notes"))
             )
-        content.add_widget(field_container)
-
-        popup = Popup(
-            title="",
-            separator_height=0,
-            content=content,
-            size_hint=(0.88, None),
-            height=470,
-            auto_dismiss=False,
-            background="",
-            background_color=(0, 0, 0, 0),
-        )
-        close_button.bind(on_release=lambda _instance: popup.dismiss())
-        popup.open()
+        card.add_widget(field_container)
+        outer.add_widget(card)
+        modal.add_widget(outer)
+        close_button.bind(on_release=lambda _instance: modal.dismiss())
+        modal.open()
 
     def _build_detail_row(self, label_text: str, value_text: str, *, multiline: bool = False) -> BoxLayout:
-        row_height = 112 if multiline else 72
+        row_height = dp(98) if multiline else dp(60)
         row = BoxLayout(
-            orientation="vertical",
-            spacing=6,
+            orientation="horizontal",
+            spacing=dp(12),
             size_hint_y=None,
             height=row_height,
-            padding=(14, 12),
+            padding=(dp(14), dp(12)),
         )
 
         def redraw_card(instance: BoxLayout, _value) -> None:
@@ -1036,19 +1043,20 @@ class ExpenseListScreen(Screen):
 
         label = Label(
             text=label_text,
-            size_hint_y=None,
-            height=20,
+            size_hint_x=None,
+            width=dp(96),
             halign="left",
-            valign="middle",
+            valign="top" if multiline else "middle",
             color=(0.45, 0.5, 0.48, 1),
             font_size="12sp",
+            bold=True,
         )
         value = Label(
             text=value_text,
             halign="left",
             valign="top" if multiline else "middle",
             color=(0.15, 0.18, 0.16, 1),
-            font_size="16sp",
+            font_size="15sp",
             shorten=not multiline,
             shorten_from="right",
         )
