@@ -534,6 +534,8 @@ class ExpenseRow(BoxLayout):
     method_text = StringProperty("")
     list_screen = ObjectProperty(allownone=True)
     action_button = ObjectProperty(allownone=True)
+    _touch_start = ObjectProperty(allownone=True)
+    _touch_moved = NumericProperty(0)
 
     def open_actions(self, _anchor: Button) -> None:
         content = BoxLayout(orientation="vertical", spacing=10, padding=16)
@@ -587,14 +589,37 @@ class ExpenseRow(BoxLayout):
         if self.list_screen is not None and self.expense_id:
             self.list_screen.confirm_delete(self.expense_id)
 
+    def on_touch_down(self, touch) -> bool:
+        if self.collide_point(*touch.pos):
+            if self.action_button is not None and self.action_button.collide_point(*touch.pos):
+                return super().on_touch_down(touch)
+            self._touch_start = touch.pos
+            self._touch_moved = 0
+        return super().on_touch_down(touch)
+
+    def on_touch_move(self, touch) -> bool:
+        if self._touch_start is not None:
+            if abs(touch.pos[0] - self._touch_start[0]) > 10 or abs(touch.pos[1] - self._touch_start[1]) > 10:
+                self._touch_moved = 1
+        return super().on_touch_move(touch)
+
     def on_touch_up(self, touch) -> bool:
         if not self.collide_point(*touch.pos):
+            self._touch_start = None
+            self._touch_moved = 0
             return super().on_touch_up(touch)
         if self.action_button is not None and self.action_button.collide_point(*touch.pos):
+            self._touch_start = None
+            self._touch_moved = 0
             return super().on_touch_up(touch)
-        if self.list_screen is not None and self.expense_id:
-            self.list_screen.view_expense(self.expense_id)
-            return True
+        if self._touch_start is not None and not self._touch_moved:
+            self._touch_start = None
+            self._touch_moved = 0
+            if self.list_screen is not None and self.expense_id:
+                self.list_screen.view_expense(self.expense_id)
+                return True
+        self._touch_start = None
+        self._touch_moved = 0
         return super().on_touch_up(touch)
 
 
@@ -925,14 +950,26 @@ class ExpenseListScreen(Screen):
             RoundedRectangle(pos=instance.pos, size=instance.size, radius=[24, 24, 24, 24])
 
     def _open_expense_detail_popup(self, expense: ExpenseRecord) -> None:
-        content = BoxLayout(orientation="vertical", spacing=12, padding=16)
+        content = BoxLayout(orientation="vertical", spacing=14, padding=18)
 
-        header = BoxLayout(size_hint_y=None, height=38)
+        def redraw_popup_card(instance: BoxLayout, _value) -> None:
+            from kivy.graphics import Color, RoundedRectangle
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(0.99, 0.98, 0.96, 1)
+                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[24, 24, 24, 24])
+
+        content.bind(pos=redraw_popup_card, size=redraw_popup_card)
+        redraw_popup_card(content, None)
+
+        header = BoxLayout(size_hint_y=None, height=42, spacing=12)
         title = Label(
             text="Expense Details",
             halign="left",
             valign="middle",
             color=(0.14, 0.18, 0.16, 1),
+            font_size="20sp",
             bold=True,
         )
         title.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
@@ -967,16 +1004,24 @@ class ExpenseListScreen(Screen):
             title="",
             separator_height=0,
             content=content,
-            size_hint=(0.9, None),
-            height=420,
-            auto_dismiss=True,
+            size_hint=(0.88, None),
+            height=470,
+            auto_dismiss=False,
+            background="",
+            background_color=(0, 0, 0, 0),
         )
         close_button.bind(on_release=lambda _instance: popup.dismiss())
         popup.open()
 
     def _build_detail_row(self, label_text: str, value_text: str, *, multiline: bool = False) -> BoxLayout:
-        row_height = 104 if multiline else 64
-        row = BoxLayout(orientation="vertical", spacing=4, size_hint_y=None, height=row_height, padding=(14, 10))
+        row_height = 112 if multiline else 72
+        row = BoxLayout(
+            orientation="vertical",
+            spacing=6,
+            size_hint_y=None,
+            height=row_height,
+            padding=(14, 12),
+        )
 
         def redraw_card(instance: BoxLayout, _value) -> None:
             from kivy.graphics import Color, RoundedRectangle
@@ -992,7 +1037,7 @@ class ExpenseListScreen(Screen):
         label = Label(
             text=label_text,
             size_hint_y=None,
-            height=18,
+            height=20,
             halign="left",
             valign="middle",
             color=(0.45, 0.5, 0.48, 1),
@@ -1008,7 +1053,13 @@ class ExpenseListScreen(Screen):
             shorten_from="right",
         )
         label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        value.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        value.bind(
+            size=lambda instance, _value: setattr(
+                instance,
+                "text_size",
+                (instance.width, None if multiline else instance.height),
+            )
+        )
         row.add_widget(label)
         row.add_widget(value)
         return row
