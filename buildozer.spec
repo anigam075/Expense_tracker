@@ -29,7 +29,7 @@ android.add_src = android_src
 
 # Permissions
 android.permissions =
-android.extra_manifest_application_arguments = <service android:name="org.example.expensetracker.ExpenseNotificationListener" android:label="Expense Tracker Notifications" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="false"><intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter></service>
+android.extra_manifest_application_arguments = android_manifest_application.xml
 
 # Entry point
 presplash.filename =
