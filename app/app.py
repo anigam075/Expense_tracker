@@ -22,13 +22,51 @@ from kivy.uix.popup import Popup
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.spinner import Spinner
+from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
 
 from app.database import ExpenseRepository
-from app.models import ExpenseRecord
+from app.models import ExpenseRecord, NotificationReviewRecord
+from app.notification_parser import parse_notification_text
 
 KV = """
 #:import dp kivy.metrics.dp
+
+<BottomTabBar@BoxLayout>:
+    active_tab: ""
+    size_hint_y: None
+    height: "72dp"
+    padding: "12dp"
+    spacing: "12dp"
+    canvas.before:
+        Color:
+            rgba: 1, 1, 1, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+        Color:
+            rgba: 0.88, 0.92, 0.9, 1
+        Line:
+            points: self.x, self.top, self.right, self.top
+            width: 1
+
+    Button:
+        text: "Home"
+        background_normal: ""
+        background_down: ""
+        background_color: (0.21, 0.56, 0.39, 1) if root.active_tab == "home" else (0.93, 0.95, 0.94, 1)
+        color: (1, 1, 1, 1) if root.active_tab == "home" else (0.14, 0.18, 0.16, 1)
+        bold: True
+        on_release: app.root.current = "list"
+
+    Button:
+        text: "Notifications"
+        background_normal: ""
+        background_down: ""
+        background_color: (0.21, 0.56, 0.39, 1) if root.active_tab == "notifications" else (0.93, 0.95, 0.94, 1)
+        color: (1, 1, 1, 1) if root.active_tab == "notifications" else (0.14, 0.18, 0.16, 1)
+        bold: True
+        on_release: app.root.current = "notifications"
 
 <ExpenseRow>:
     action_button: action_button
@@ -357,6 +395,130 @@ KV = """
                     height: self.minimum_height
                     spacing: "12dp"
                     padding: 0, 0, 0, "20dp"
+
+        BottomTabBar:
+            active_tab: "home"
+
+<NotificationsScreen>:
+    name: "notifications"
+    BoxLayout:
+        orientation: "vertical"
+        canvas.before:
+            Color:
+                rgba: 0.97, 0.95, 0.91, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_y: None
+            height: "216dp"
+            padding: "18dp"
+            spacing: "12dp"
+            canvas.before:
+                Color:
+                    rgba: 0.14, 0.35, 0.27, 1
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [0, 0, 30, 30]
+
+            Label:
+                text: "Notifications"
+                size_hint_y: None
+                height: "34dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                font_size: "30sp"
+                bold: True
+                color: 1, 1, 1, 1
+
+            Label:
+                text: "Parse captured notifications, review them, and save only the valid expenses."
+                size_hint_y: None
+                height: "40dp"
+                halign: "left"
+                valign: "top"
+                text_size: self.width, None
+                color: 0.84, 0.93, 0.89, 1
+
+            Label:
+                text: root.status_message
+                size_hint_y: None
+                height: "22dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                color: root.status_color
+
+            BoxLayout:
+                size_hint_y: None
+                height: "44dp"
+                spacing: "10dp"
+
+                Spinner:
+                    id: source_app_input
+                    text: "Google Pay"
+                    values: ["Google Pay", "PhonePe", "Paytm", "Bank SMS", "Bank App", "Other"]
+                    background_normal: ""
+                    background_color: 0.95, 0.96, 0.95, 1
+                    color: 0.14, 0.18, 0.16, 1
+
+                Button:
+                    text: "Parse"
+                    size_hint_x: None
+                    width: "112dp"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.84, 0.92, 0.88, 1
+                    color: 0.13, 0.24, 0.19, 1
+                    bold: True
+                    on_release: root.parse_notification()
+
+        BoxLayout:
+            orientation: "vertical"
+            padding: "18dp"
+            spacing: "12dp"
+
+            TextInput:
+                id: notification_input
+                size_hint_y: None
+                height: "112dp"
+                hint_text: "Paste a raw notification text here for parsing and review."
+                background_normal: ""
+                background_active: ""
+                background_color: 1, 1, 1, 1
+                foreground_color: 0.15, 0.18, 0.16, 1
+                cursor_color: 0.18, 0.5, 0.32, 1
+                padding: "14dp", "14dp"
+
+            Label:
+                text: "Pending Review"
+                size_hint_y: None
+                height: "24dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                font_size: "21sp"
+                bold: True
+                color: 0.15, 0.18, 0.16, 1
+
+            ScrollView:
+                do_scroll_x: False
+                bar_width: "4dp"
+
+                BoxLayout:
+                    id: review_container
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: "12dp"
+                    padding: 0, 0, 0, "20dp"
+
+        BottomTabBar:
+            active_tab: "notifications"
 
 <ExpenseEditScreen>:
     name: "edit"
@@ -1335,6 +1497,287 @@ class ExpenseListScreen(Screen):
         return row
 
 
+class NotificationsScreen(Screen):
+    repository = ObjectProperty(allownone=False)
+    status_message = StringProperty("Paste a notification text and parse it into the review queue.")
+    status_color = ListProperty([0.84, 0.93, 0.89, 1])
+
+    def on_pre_enter(self, *args) -> None:
+        self.refresh_reviews()
+        return super().on_pre_enter(*args)
+
+    def parse_notification(self) -> None:
+        raw_text = self.ids.notification_input.text.strip()
+        source_app = self.ids.source_app_input.text.strip()
+        parsed = parse_notification_text(raw_text, source_app=source_app)
+        if parsed is None:
+            self._set_status("Unable to parse amount from this notification.", is_error=True)
+            return
+
+        review = self.repository.add_notification_review(
+            NotificationReviewRecord(
+                id=None,
+                source_app=parsed.source_app,
+                raw_text=parsed.raw_text,
+                amount=parsed.amount,
+                merchant=parsed.merchant,
+                payment_method=parsed.payment_method,
+                expense_date=parsed.expense_date,
+                notes=parsed.notes,
+            )
+        )
+        self.ids.notification_input.text = ""
+        self._set_status(f"Parsed notification from {review.source_app}. Review and save it.", is_error=False)
+        self.refresh_reviews()
+
+    def refresh_reviews(self) -> None:
+        container = self.ids.review_container
+        container.clear_widgets()
+        reviews = self.repository.list_notification_reviews(status="pending")
+
+        if not reviews:
+            empty = Label(
+                text="No pending notifications yet.",
+                size_hint_y=None,
+                height=dp(54),
+                halign="center",
+                valign="middle",
+                color=(0.32, 0.36, 0.34, 1),
+            )
+            empty.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+            container.add_widget(empty)
+            return
+
+        for review in reviews:
+            container.add_widget(self._build_review_card(review))
+
+    def _build_review_card(self, review: NotificationReviewRecord) -> BoxLayout:
+        card = BoxLayout(orientation="vertical", spacing=dp(10), size_hint_y=None, height=dp(168), padding=dp(14))
+
+        def redraw_card(instance: BoxLayout, _value) -> None:
+            from kivy.graphics import Color, RoundedRectangle
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(1, 1, 1, 1)
+                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[22, 22, 22, 22])
+
+        card.bind(pos=redraw_card, size=redraw_card)
+        redraw_card(card, None)
+
+        header = BoxLayout(size_hint_y=None, height=dp(22))
+        source = Label(
+            text=review.source_app,
+            halign="left",
+            valign="middle",
+            color=(0.11, 0.31, 0.21, 1),
+            bold=True,
+        )
+        amount = Label(
+            text=f"Rs. {review.amount:.2f}",
+            halign="right",
+            valign="middle",
+            color=(0.11, 0.31, 0.21, 1),
+            bold=True,
+        )
+        source.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        amount.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        header.add_widget(source)
+        header.add_widget(amount)
+        card.add_widget(header)
+
+        merchant = Label(
+            text=review.merchant,
+            size_hint_y=None,
+            height=dp(26),
+            halign="left",
+            valign="middle",
+            font_size="20sp",
+            bold=True,
+            color=(0.15, 0.18, 0.16, 1),
+        )
+        merchant.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        card.add_widget(merchant)
+
+        meta = Label(
+            text=f"{review.payment_method}  |  {review.expense_date}",
+            size_hint_y=None,
+            height=dp(20),
+            halign="left",
+            valign="middle",
+            color=(0.47, 0.52, 0.49, 1),
+        )
+        meta.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        card.add_widget(meta)
+
+        notes = Label(
+            text=review.notes,
+            size_hint_y=None,
+            height=dp(34),
+            halign="left",
+            valign="top",
+            color=(0.47, 0.52, 0.49, 1),
+            shorten=True,
+            shorten_from="right",
+        )
+        notes.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, instance.height)))
+        card.add_widget(notes)
+
+        actions = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(10))
+        review_button = Button(
+            text="Review",
+            background_normal="",
+            background_down="",
+            background_color=(0.84, 0.92, 0.88, 1),
+            color=(0.13, 0.24, 0.19, 1),
+        )
+        save_button = Button(
+            text="Save",
+            background_normal="",
+            background_down="",
+            background_color=(0.21, 0.56, 0.39, 1),
+            color=(1, 1, 1, 1),
+        )
+        reject_button = Button(
+            text="Reject",
+            background_normal="",
+            background_down="",
+            background_color=(0.68, 0.24, 0.2, 1),
+            color=(1, 1, 1, 1),
+        )
+        review_button.bind(on_release=lambda _instance: self.open_review_popup(review.id or 0))
+        save_button.bind(on_release=lambda _instance: self.save_review(review.id or 0))
+        reject_button.bind(on_release=lambda _instance: self.reject_review(review.id or 0))
+        actions.add_widget(review_button)
+        actions.add_widget(save_button)
+        actions.add_widget(reject_button)
+        card.add_widget(actions)
+        return card
+
+    def open_review_popup(self, review_id: int) -> None:
+        review = self.repository.get_notification_review(review_id)
+        if review is None:
+            self._set_status("Notification review not found.", is_error=True)
+            self.refresh_reviews()
+            return
+
+        content = BoxLayout(orientation="vertical", spacing=dp(10), padding=dp(16))
+        fields: dict[str, object] = {}
+        for label_text, key, value in (
+            ("Amount", "amount", f"{review.amount:.2f}"),
+            ("Merchant", "merchant", review.merchant),
+            ("Payment Method", "payment_method", review.payment_method),
+            ("Date", "expense_date", review.expense_date),
+        ):
+            label = Label(
+                text=label_text,
+                size_hint_y=None,
+                height=dp(18),
+                halign="left",
+                valign="middle",
+                color=(0.15, 0.18, 0.16, 1),
+            )
+            label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+            field = TextInput(
+                text=value,
+                size_hint_y=None,
+                height=dp(46),
+                multiline=False,
+            )
+            fields[key] = field
+            content.add_widget(label)
+            content.add_widget(field)
+
+        notes_label = Label(
+            text="Notes",
+            size_hint_y=None,
+            height=dp(18),
+            halign="left",
+            valign="middle",
+            color=(0.15, 0.18, 0.16, 1),
+        )
+        notes_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        notes_input = TextInput(text=review.notes, size_hint_y=None, height=dp(90))
+        fields["notes"] = notes_input
+        content.add_widget(notes_label)
+        content.add_widget(notes_input)
+
+        buttons = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
+        cancel_button = Button(text="Cancel", background_normal="", background_down="", background_color=(0.46, 0.51, 0.49, 1), color=(1, 1, 1, 1))
+        save_button = Button(text="Save Changes", background_normal="", background_down="", background_color=(0.21, 0.56, 0.39, 1), color=(1, 1, 1, 1))
+        buttons.add_widget(cancel_button)
+        buttons.add_widget(save_button)
+        content.add_widget(buttons)
+
+        popup = Popup(title="Review Notification", content=content, size_hint=(0.92, None), height=dp(520), auto_dismiss=False)
+        cancel_button.bind(on_release=lambda _instance: popup.dismiss())
+        save_button.bind(on_release=lambda _instance: self._save_review_changes(review, fields, popup))
+        popup.open()
+
+    def _save_review_changes(self, review: NotificationReviewRecord, fields: dict[str, object], popup: Popup) -> None:
+        amount_text = str(fields["amount"].text).strip()
+        merchant = " ".join(str(fields["merchant"].text).strip().split())
+        payment_method = " ".join(str(fields["payment_method"].text).strip().split())
+        expense_date = str(fields["expense_date"].text).strip()
+        notes = " ".join(str(fields["notes"].text).strip().split())
+
+        if not amount_text or not merchant or not payment_method or not expense_date:
+            self._set_status("Amount, merchant, payment method, and date are required.", is_error=True)
+            return
+
+        try:
+            amount = float(amount_text)
+        except ValueError:
+            self._set_status("Please enter a valid amount for this notification.", is_error=True)
+            return
+
+        try:
+            date.fromisoformat(expense_date)
+        except ValueError:
+            self._set_status("Notification date must use YYYY-MM-DD.", is_error=True)
+            return
+
+        self.repository.update_notification_review(
+            NotificationReviewRecord(
+                id=review.id,
+                source_app=review.source_app,
+                raw_text=review.raw_text,
+                amount=amount,
+                merchant=merchant,
+                payment_method=payment_method,
+                expense_date=expense_date,
+                notes=notes,
+                status=review.status,
+            )
+        )
+        popup.dismiss()
+        self._set_status("Notification updated. Review and save when ready.", is_error=False)
+        self.refresh_reviews()
+
+    def save_review(self, review_id: int) -> None:
+        review = self.repository.get_notification_review(review_id)
+        if review is None:
+            self._set_status("Notification review not found.", is_error=True)
+            self.refresh_reviews()
+            return
+
+        saved_expense = self.repository.confirm_notification_review(review)
+        self._set_status(f"Saved Rs. {saved_expense.amount:.2f} from notifications.", is_error=False)
+        self.refresh_reviews()
+        home_screen = self.manager.get_screen("list")
+        home_screen.show_saved_status(f"Saved Rs. {saved_expense.amount:.2f} for {saved_expense.merchant}.")
+        home_screen.refresh_expenses()
+
+    def reject_review(self, review_id: int) -> None:
+        self.repository.reject_notification_review(review_id)
+        self._set_status("Notification removed from the review queue.", is_error=False)
+        self.refresh_reviews()
+
+    def _set_status(self, message: str, *, is_error: bool) -> None:
+        self.status_message = message
+        self.status_color = [0.98, 0.82, 0.78, 1] if is_error else [0.84, 0.93, 0.89, 1]
+
+
 class VisualizationScreen(Screen):
     repository = ObjectProperty(allownone=False)
     chart_mode = StringProperty("monthly")
@@ -1654,6 +2097,7 @@ class ExpenseTrackerApp(App):
             repository = ExpenseRepository(Path(self.user_data_dir) / "expenses.db")
             root = ExpenseRoot(repository=repository)
             root.add_widget(ExpenseListScreen(repository=repository))
+            root.add_widget(NotificationsScreen(repository=repository))
             root.add_widget(ExpenseEditScreen(repository=repository))
             root.add_widget(VisualizationScreen(repository=repository))
             root.current = "list"
