@@ -49,6 +49,14 @@ class ExpenseRepository:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS app_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
 
     def add_expense(self, expense: ExpenseRecord) -> ExpenseRecord:
         with self._connect() as connection:
@@ -314,6 +322,27 @@ class ExpenseRepository:
 
         if cursor.rowcount == 0:
             raise ValueError(f"Notification review with id {review_id} was not found.")
+
+    def get_state(self, key: str, default: str = "") -> str:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM app_state WHERE key = ?",
+                (key,),
+            ).fetchone()
+        if row is None:
+            return default
+        return str(row["value"])
+
+    def set_state(self, key: str, value: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO app_state (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (key, value),
+            )
 
     def _row_to_record(self, row: sqlite3.Row) -> ExpenseRecord:
         return ExpenseRecord(

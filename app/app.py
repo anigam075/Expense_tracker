@@ -26,6 +26,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
 
 from app.database import ExpenseRepository
+from app.android_bridge import open_notification_listener_settings, read_captured_notifications
 from app.models import ExpenseRecord, NotificationReviewRecord
 from app.notification_parser import parse_notification_text
 
@@ -476,6 +477,28 @@ KV = """
                     color: 0.13, 0.24, 0.19, 1
                     bold: True
                     on_release: root.parse_notification()
+
+            BoxLayout:
+                size_hint_y: None
+                height: "42dp"
+                spacing: "10dp"
+
+                Button:
+                    text: "Enable Access"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.93, 0.95, 0.94, 1
+                    color: 0.14, 0.18, 0.16, 1
+                    on_release: root.enable_listener_access()
+
+                Button:
+                    text: "Sync Device Notifications"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.84, 0.92, 0.88, 1
+                    color: 0.13, 0.24, 0.19, 1
+                    bold: True
+                    on_release: root.sync_native_notifications()
 
         BoxLayout:
             orientation: "vertical"
@@ -1503,8 +1526,48 @@ class NotificationsScreen(Screen):
     status_color = ListProperty([0.84, 0.93, 0.89, 1])
 
     def on_pre_enter(self, *args) -> None:
+        self.sync_native_notifications()
         self.refresh_reviews()
         return super().on_pre_enter(*args)
+
+    def enable_listener_access(self) -> None:
+        if open_notification_listener_settings():
+            self._set_status("Notification access settings opened. Enable Expense Tracker there, then sync.", is_error=False)
+            return
+        self._set_status("Notification listener access is available only on Android builds.", is_error=True)
+
+    def sync_native_notifications(self) -> None:
+        captured, new_offset = read_captured_notifications()
+        if not captured:
+            return
+
+        imported_count = 0
+        for item in captured:
+            raw_text = " ".join(
+                str(part).strip()
+                for part in (item.get("title", ""), item.get("text", ""), item.get("big_text", ""))
+                if str(part).strip()
+            )
+            parsed = parse_notification_text(raw_text, source_app=self._package_to_source(str(item.get("package_name", ""))))
+            if parsed is None:
+                continue
+            self.repository.add_notification_review(
+                NotificationReviewRecord(
+                    id=None,
+                    source_app=parsed.source_app,
+                    raw_text=parsed.raw_text,
+                    amount=parsed.amount,
+                    merchant=parsed.merchant,
+                    payment_method=parsed.payment_method,
+                    expense_date=parsed.expense_date,
+                    notes=parsed.notes,
+                )
+            )
+            imported_count += 1
+
+        self.repository.set_state("notification_file_offset", str(new_offset))
+        if imported_count:
+            self._set_status(f"Imported {imported_count} notification(s) into review.", is_error=False)
 
     def parse_notification(self) -> None:
         raw_text = self.ids.notification_input.text.strip()
@@ -1776,6 +1839,18 @@ class NotificationsScreen(Screen):
     def _set_status(self, message: str, *, is_error: bool) -> None:
         self.status_message = message
         self.status_color = [0.98, 0.82, 0.78, 1] if is_error else [0.84, 0.93, 0.89, 1]
+
+    def _package_to_source(self, package_name: str) -> str:
+        lowered = package_name.lower()
+        if "gpay" in lowered or "google" in lowered:
+            return "Google Pay"
+        if "phonepe" in lowered:
+            return "PhonePe"
+        if "paytm" in lowered:
+            return "Paytm"
+        if "sms" in lowered:
+            return "Bank SMS"
+        return "Notification"
 
 
 class VisualizationScreen(Screen):

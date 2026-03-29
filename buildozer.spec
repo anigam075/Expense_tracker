@@ -14,7 +14,7 @@ source.exclude_dirs = env,.venv,venv,.git,__pycache__,bin,.buildozer,.github
 version = 0.1
 
 # Dependencies
-requirements = python3,kivy==2.3.1,filetype
+requirements = python3,kivy==2.3.1,filetype,pyjnius
 
 # Orientation and UI
 orientation = portrait
@@ -25,9 +25,11 @@ android.api = 34
 android.minapi = 24
 android.archs = arm64-v8a
 android.accept_sdk_license = True
+android.add_src = android_src
 
 # Permissions
 android.permissions =
+android.extra_manifest_application_arguments = <service android:name="org.example.expensetracker.ExpenseNotificationListener" android:label="Expense Tracker Notifications" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="false"><intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter></service>
 
 # Entry point
 presplash.filename =
