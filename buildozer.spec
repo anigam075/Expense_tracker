@@ -29,7 +29,7 @@ android.add_src = android_src
 
 # Permissions
 android.permissions =
-android.extra_manifest_application_arguments = android_manifest_application.xml
+p4a.hook = p4a/hook.py
 
 # Entry point
 presplash.filename =
