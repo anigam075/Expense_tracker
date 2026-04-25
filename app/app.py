@@ -25,6 +25,7 @@ from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
+from plyer import filechooser as plyer_filechooser
 
 from app.database import ExpenseRepository
 from app.models import ExpenseRecord, StatementReviewRecord
@@ -1554,6 +1555,19 @@ class NotificationsScreen(Screen):
         return super().on_pre_enter(*args)
 
     def open_file_browser(self) -> None:
+        try:
+            plyer_filechooser.open_file(
+                title="Choose Statement PDF",
+                filters=["*.pdf"],
+                path=str(self._default_statement_dir()),
+                on_selection=self._handle_native_selection,
+            )
+            self._set_status("File manager opened. Choose a PDF statement there.", is_error=False)
+            return
+        except Exception:
+            self._open_embedded_file_browser()
+
+    def _open_embedded_file_browser(self) -> None:
         chooser = FileChooserListView(
             path=str(self._default_statement_dir()),
             filters=["*.pdf"],
@@ -1591,6 +1605,12 @@ class NotificationsScreen(Screen):
         cancel_button.bind(on_release=lambda _instance: popup.dismiss())
         select_button.bind(on_release=lambda _instance: self._select_statement_path(chooser, popup))
         popup.open()
+
+    def _handle_native_selection(self, selection: list[str] | tuple[str, ...]) -> None:
+        if not selection:
+            return
+        self.ids.statement_path_input.text = str(selection[0])
+        self._set_status(f"Selected {Path(selection[0]).name}. Import it when ready.", is_error=False)
 
     def import_statement(self) -> None:
         raw_path = self.ids.statement_path_input.text.strip()
