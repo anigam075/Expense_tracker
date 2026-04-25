@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from app.models import ExpenseRecord, NotificationReviewRecord
+from app.models import ExpenseRecord, NotificationReviewRecord, StatementReviewRecord
 
 
 class ExpenseRepository:
@@ -44,6 +44,25 @@ class ExpenseRepository:
                     payment_method TEXT NOT NULL,
                     expense_date TEXT NOT NULL,
                     notes TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS statement_reviews (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bank_name TEXT NOT NULL,
+                    account_last4 TEXT NOT NULL DEFAULT '',
+                    source_file TEXT NOT NULL DEFAULT '',
+                    amount REAL NOT NULL,
+                    direction TEXT NOT NULL DEFAULT 'unknown',
+                    merchant TEXT NOT NULL,
+                    payment_method TEXT NOT NULL,
+                    expense_date TEXT NOT NULL,
+                    reference_no TEXT NOT NULL DEFAULT '',
+                    raw_row TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'pending',
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
@@ -344,6 +363,171 @@ class ExpenseRepository:
                 (key, value),
             )
 
+    def add_statement_review(self, review: StatementReviewRecord) -> StatementReviewRecord:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO statement_reviews (
+                    bank_name,
+                    account_last4,
+                    source_file,
+                    amount,
+                    direction,
+                    merchant,
+                    payment_method,
+                    expense_date,
+                    reference_no,
+                    raw_row,
+                    status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    review.bank_name,
+                    review.account_last4,
+                    review.source_file,
+                    review.amount,
+                    review.direction,
+                    review.merchant,
+                    review.payment_method,
+                    review.expense_date,
+                    review.reference_no,
+                    review.raw_row,
+                    review.status,
+                ),
+            )
+
+        return StatementReviewRecord(
+            id=cursor.lastrowid,
+            bank_name=review.bank_name,
+            account_last4=review.account_last4,
+            source_file=review.source_file,
+            amount=review.amount,
+            direction=review.direction,
+            merchant=review.merchant,
+            payment_method=review.payment_method,
+            expense_date=review.expense_date,
+            reference_no=review.reference_no,
+            raw_row=review.raw_row,
+            status=review.status,
+        )
+
+    def list_statement_reviews(self, status: str = "pending") -> list[StatementReviewRecord]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, bank_name, account_last4, source_file, amount, direction, merchant,
+                       payment_method, expense_date, reference_no, raw_row, status
+                FROM statement_reviews
+                WHERE status = ?
+                ORDER BY expense_date DESC, id DESC
+                """,
+                (status,),
+            ).fetchall()
+
+        return [self._row_to_statement_review(row) for row in rows]
+
+    def get_statement_review(self, review_id: int) -> StatementReviewRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id, bank_name, account_last4, source_file, amount, direction, merchant,
+                       payment_method, expense_date, reference_no, raw_row, status
+                FROM statement_reviews
+                WHERE id = ?
+                """,
+                (review_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return self._row_to_statement_review(row)
+
+    def update_statement_review(self, review: StatementReviewRecord) -> StatementReviewRecord:
+        if review.id is None:
+            raise ValueError("Statement review id is required for updates.")
+
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE statement_reviews
+                SET bank_name = ?,
+                    account_last4 = ?,
+                    source_file = ?,
+                    amount = ?,
+                    direction = ?,
+                    merchant = ?,
+                    payment_method = ?,
+                    expense_date = ?,
+                    reference_no = ?,
+                    raw_row = ?,
+                    status = ?
+                WHERE id = ?
+                """,
+                (
+                    review.bank_name,
+                    review.account_last4,
+                    review.source_file,
+                    review.amount,
+                    review.direction,
+                    review.merchant,
+                    review.payment_method,
+                    review.expense_date,
+                    review.reference_no,
+                    review.raw_row,
+                    review.status,
+                    review.id,
+                ),
+            )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"Statement review with id {review.id} was not found.")
+
+        return review
+
+    def confirm_statement_review(self, review: StatementReviewRecord) -> ExpenseRecord:
+        updated_review = self.update_statement_review(
+            StatementReviewRecord(
+                id=review.id,
+                bank_name=review.bank_name,
+                account_last4=review.account_last4,
+                source_file=review.source_file,
+                amount=review.amount,
+                direction=review.direction,
+                merchant=review.merchant,
+                payment_method=review.payment_method,
+                expense_date=review.expense_date,
+                reference_no=review.reference_no,
+                raw_row=review.raw_row,
+                status="confirmed",
+            )
+        )
+        return self.add_expense(
+            ExpenseRecord(
+                id=None,
+                amount=updated_review.amount,
+                merchant=updated_review.merchant,
+                payment_method=updated_review.payment_method,
+                expense_date=updated_review.expense_date,
+                notes=f"{updated_review.bank_name} x{updated_review.account_last4}".strip(),
+                source="statement",
+            )
+        )
+
+    def reject_statement_review(self, review_id: int) -> None:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE statement_reviews
+                SET status = 'rejected'
+                WHERE id = ?
+                """,
+                (review_id,),
+            )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"Statement review with id {review_id} was not found.")
+
     def _row_to_record(self, row: sqlite3.Row) -> ExpenseRecord:
         return ExpenseRecord(
             id=row["id"],
@@ -365,5 +549,21 @@ class ExpenseRepository:
             payment_method=row["payment_method"],
             expense_date=row["expense_date"],
             notes=row["notes"],
+            status=row["status"],
+        )
+
+    def _row_to_statement_review(self, row: sqlite3.Row) -> StatementReviewRecord:
+        return StatementReviewRecord(
+            id=row["id"],
+            bank_name=row["bank_name"],
+            account_last4=row["account_last4"],
+            source_file=row["source_file"],
+            amount=row["amount"],
+            direction=row["direction"],
+            merchant=row["merchant"],
+            payment_method=row["payment_method"],
+            expense_date=row["expense_date"],
+            reference_no=row["reference_no"],
+            raw_row=row["raw_row"],
             status=row["status"],
         )

@@ -15,6 +15,7 @@ from kivy.properties import ListProperty, NumericProperty, ObjectProperty, Strin
 from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
+from kivy.uix.filechooser import FileChooserListView
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.modalview import ModalView
@@ -26,9 +27,8 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
 
 from app.database import ExpenseRepository
-from app.android_bridge import open_notification_listener_settings, read_captured_notifications
-from app.models import ExpenseRecord, NotificationReviewRecord
-from app.notification_parser import parse_notification_text
+from app.models import ExpenseRecord, StatementReviewRecord
+from app.statement_parser import parse_statement_pdf
 
 KV = """
 #:import dp kivy.metrics.dp
@@ -61,7 +61,7 @@ KV = """
         on_release: app.root.current = "list"
 
     Button:
-        text: "Notifications"
+        text: "Statements"
         background_normal: ""
         background_down: ""
         background_color: (0.21, 0.56, 0.39, 1) if root.active_tab == "notifications" else (0.93, 0.95, 0.94, 1)
@@ -414,7 +414,7 @@ KV = """
         BoxLayout:
             orientation: "vertical"
             size_hint_y: None
-            height: "216dp"
+            height: "286dp"
             padding: "18dp"
             spacing: "12dp"
             canvas.before:
@@ -426,7 +426,7 @@ KV = """
                     radius: [0, 0, 30, 30]
 
             Label:
-                text: "Notifications"
+                text: "Statements"
                 size_hint_y: None
                 height: "34dp"
                 halign: "left"
@@ -437,9 +437,9 @@ KV = """
                 color: 1, 1, 1, 1
 
             Label:
-                text: "Parse captured notifications, review them, and save only the valid expenses."
+                text: "Upload a bank statement PDF, review imported rows, and save only the debit transactions."
                 size_hint_y: None
-                height: "40dp"
+                height: "44dp"
                 halign: "left"
                 valign: "top"
                 text_size: self.width, None
@@ -456,77 +456,101 @@ KV = """
 
             BoxLayout:
                 size_hint_y: None
+                height: "48dp"
+                spacing: "10dp"
+
+                TextInput:
+                    id: statement_path_input
+                    hint_text: "Statement PDF path"
+                    multiline: False
+                    background_normal: ""
+                    background_active: ""
+                    background_color: 0.95, 0.96, 0.95, 1
+                    foreground_color: 0.14, 0.18, 0.16, 1
+                    cursor_color: 0.18, 0.5, 0.32, 1
+                    padding: "12dp", "12dp"
+
+            BoxLayout:
+                size_hint_y: None
+                height: "44dp"
+                spacing: "10dp"
+
+                Button:
+                    text: "Browse PDF"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.93, 0.95, 0.94, 1
+                    color: 0.14, 0.18, 0.16, 1
+                    on_release: root.open_file_browser()
+
+                Button:
+                    text: "Import Statement"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.84, 0.92, 0.88, 1
+                    color: 0.13, 0.24, 0.19, 1
+                    bold: True
+                    on_release: root.import_statement()
+
+            BoxLayout:
+                size_hint_y: None
                 height: "44dp"
                 spacing: "10dp"
 
                 Spinner:
-                    id: source_app_input
-                    text: "Google Pay"
-                    values: ["Google Pay", "PhonePe", "Paytm", "Bank SMS", "Bank App", "Other"]
+                    id: bulk_method_input
+                    text: "Bulk Method"
+                    values: ["Bulk Method", "UPI", "Card", "Cash", "NEFT", "IMPS", "ACH", "Bank Transfer", "Other"]
                     background_normal: ""
                     background_color: 0.95, 0.96, 0.95, 1
                     color: 0.14, 0.18, 0.16, 1
 
                 Button:
-                    text: "Parse"
-                    size_hint_x: None
-                    width: "112dp"
-                    background_normal: ""
-                    background_down: ""
-                    background_color: 0.84, 0.92, 0.88, 1
-                    color: 0.13, 0.24, 0.19, 1
-                    bold: True
-                    on_release: root.parse_notification()
-
-            BoxLayout:
-                size_hint_y: None
-                height: "42dp"
-                spacing: "10dp"
-
-                Button:
-                    text: "Enable Access"
+                    text: "Apply To Pending"
                     background_normal: ""
                     background_down: ""
                     background_color: 0.93, 0.95, 0.94, 1
                     color: 0.14, 0.18, 0.16, 1
-                    on_release: root.enable_listener_access()
+                    on_release: root.apply_bulk_method()
 
                 Button:
-                    text: "Sync Device Notifications"
+                    text: "Save All Debits"
                     background_normal: ""
                     background_down: ""
-                    background_color: 0.84, 0.92, 0.88, 1
-                    color: 0.13, 0.24, 0.19, 1
+                    background_color: 0.21, 0.56, 0.39, 1
+                    color: 1, 1, 1, 1
                     bold: True
-                    on_release: root.sync_native_notifications()
+                    on_release: root.save_all_debits()
 
         BoxLayout:
             orientation: "vertical"
             padding: "18dp"
             spacing: "12dp"
 
-            TextInput:
-                id: notification_input
+            BoxLayout:
                 size_hint_y: None
-                height: "112dp"
-                hint_text: "Paste a raw notification text here for parsing and review."
-                background_normal: ""
-                background_active: ""
-                background_color: 1, 1, 1, 1
-                foreground_color: 0.15, 0.18, 0.16, 1
-                cursor_color: 0.18, 0.5, 0.32, 1
-                padding: "14dp", "14dp"
+                height: "44dp"
+                spacing: "10dp"
 
-            Label:
-                text: "Pending Review"
-                size_hint_y: None
-                height: "24dp"
-                halign: "left"
-                valign: "middle"
-                text_size: self.width, self.height
-                font_size: "21sp"
-                bold: True
-                color: 0.15, 0.18, 0.16, 1
+                Label:
+                    text: "Pending Review"
+                    halign: "left"
+                    valign: "middle"
+                    text_size: self.size
+                    font_size: "21sp"
+                    bold: True
+                    color: 0.15, 0.18, 0.16, 1
+
+                Spinner:
+                    id: direction_filter_input
+                    size_hint_x: None
+                    width: "152dp"
+                    text: "All Directions"
+                    values: ["All Directions", "Debit Only", "Credit Only"]
+                    background_normal: ""
+                    background_color: 1, 1, 1, 1
+                    color: 0.15, 0.18, 0.16, 1
+                    on_text: root.refresh_reviews()
 
             ScrollView:
                 do_scroll_x: False
@@ -1522,85 +1546,150 @@ class ExpenseListScreen(Screen):
 
 class NotificationsScreen(Screen):
     repository = ObjectProperty(allownone=False)
-    status_message = StringProperty("Paste a notification text and parse it into the review queue.")
+    status_message = StringProperty("Select a statement PDF, import it, and review the rows before saving.")
     status_color = ListProperty([0.84, 0.93, 0.89, 1])
 
     def on_pre_enter(self, *args) -> None:
-        self.sync_native_notifications()
         self.refresh_reviews()
         return super().on_pre_enter(*args)
 
-    def enable_listener_access(self) -> None:
-        if open_notification_listener_settings():
-            self._set_status("Notification access settings opened. Enable Expense Tracker there, then sync.", is_error=False)
-            return
-        self._set_status("Notification listener access is available only on Android builds.", is_error=True)
+    def open_file_browser(self) -> None:
+        chooser = FileChooserListView(
+            path=str(self._default_statement_dir()),
+            filters=["*.pdf"],
+            multiselect=False,
+        )
 
-    def sync_native_notifications(self) -> None:
-        captured, new_offset = read_captured_notifications()
-        if not captured:
+        actions = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
+        cancel_button = Button(
+            text="Cancel",
+            background_normal="",
+            background_down="",
+            background_color=(0.46, 0.51, 0.49, 1),
+            color=(1, 1, 1, 1),
+        )
+        select_button = Button(
+            text="Use PDF",
+            background_normal="",
+            background_down="",
+            background_color=(0.21, 0.56, 0.39, 1),
+            color=(1, 1, 1, 1),
+        )
+        actions.add_widget(cancel_button)
+        actions.add_widget(select_button)
+
+        content = BoxLayout(orientation="vertical", spacing=dp(12), padding=dp(14))
+        content.add_widget(chooser)
+        content.add_widget(actions)
+
+        popup = Popup(
+            title="Choose Statement PDF",
+            content=content,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False,
+        )
+        cancel_button.bind(on_release=lambda _instance: popup.dismiss())
+        select_button.bind(on_release=lambda _instance: self._select_statement_path(chooser, popup))
+        popup.open()
+
+    def import_statement(self) -> None:
+        raw_path = self.ids.statement_path_input.text.strip()
+        if not raw_path:
+            self._set_status("Select or enter a statement PDF path first.", is_error=True)
             return
 
-        imported_count = 0
-        for item in captured:
-            raw_text = " ".join(
-                str(part).strip()
-                for part in (item.get("title", ""), item.get("text", ""), item.get("big_text", ""))
-                if str(part).strip()
-            )
-            parsed = parse_notification_text(raw_text, source_app=self._package_to_source(str(item.get("package_name", ""))))
-            if parsed is None:
-                continue
-            self.repository.add_notification_review(
-                NotificationReviewRecord(
+        path = Path(raw_path).expanduser()
+        if not path.exists() or path.suffix.lower() != ".pdf":
+            self._set_status("Please choose a valid PDF file.", is_error=True)
+            return
+
+        try:
+            result = parse_statement_pdf(path)
+        except Exception as exc:
+            self._set_status(f"Unable to parse statement: {exc}", is_error=True)
+            return
+
+        imported = 0
+        for txn in result.transactions:
+            self.repository.add_statement_review(
+                StatementReviewRecord(
                     id=None,
-                    source_app=parsed.source_app,
-                    raw_text=parsed.raw_text,
-                    amount=parsed.amount,
-                    merchant=parsed.merchant,
-                    payment_method=parsed.payment_method,
-                    expense_date=parsed.expense_date,
-                    notes=parsed.notes,
+                    bank_name=result.bank_name,
+                    account_last4=result.account_last4,
+                    source_file=path.name,
+                    amount=txn.amount,
+                    direction=txn.direction,
+                    merchant=txn.merchant,
+                    payment_method=txn.payment_method,
+                    expense_date=txn.txn_date,
+                    reference_no=txn.reference_no,
+                    raw_row=txn.raw_row,
                 )
             )
-            imported_count += 1
+            imported += 1
 
-        self.repository.set_state("notification_file_offset", str(new_offset))
-        if imported_count:
-            self._set_status(f"Imported {imported_count} notification(s) into review.", is_error=False)
+        warning_suffix = f" {len(result.warnings)} row(s) need manual attention." if result.warnings else ""
+        self._set_status(
+            f"Imported {imported} row(s) from {result.bank_name} statement.{warning_suffix}",
+            is_error=False,
+        )
+        self.refresh_reviews()
 
-    def parse_notification(self) -> None:
-        raw_text = self.ids.notification_input.text.strip()
-        source_app = self.ids.source_app_input.text.strip()
-        parsed = parse_notification_text(raw_text, source_app=source_app)
-        if parsed is None:
-            self._set_status("Unable to parse amount from this notification.", is_error=True)
+    def apply_bulk_method(self) -> None:
+        method = self.ids.bulk_method_input.text.strip()
+        if method == "Bulk Method":
+            self._set_status("Choose a payment method to apply.", is_error=True)
             return
 
-        review = self.repository.add_notification_review(
-            NotificationReviewRecord(
-                id=None,
-                source_app=parsed.source_app,
-                raw_text=parsed.raw_text,
-                amount=parsed.amount,
-                merchant=parsed.merchant,
-                payment_method=parsed.payment_method,
-                expense_date=parsed.expense_date,
-                notes=parsed.notes,
+        updated = 0
+        for review in self._filtered_reviews():
+            self.repository.update_statement_review(
+                StatementReviewRecord(
+                    id=review.id,
+                    bank_name=review.bank_name,
+                    account_last4=review.account_last4,
+                    source_file=review.source_file,
+                    amount=review.amount,
+                    direction=review.direction,
+                    merchant=review.merchant,
+                    payment_method=method,
+                    expense_date=review.expense_date,
+                    reference_no=review.reference_no,
+                    raw_row=review.raw_row,
+                    status=review.status,
+                )
             )
-        )
-        self.ids.notification_input.text = ""
-        self._set_status(f"Parsed notification from {review.source_app}. Review and save it.", is_error=False)
+            updated += 1
+
+        self._set_status(f"Applied {method} to {updated} pending row(s).", is_error=False)
         self.refresh_reviews()
+
+    def save_all_debits(self) -> None:
+        saved = 0
+        for review in self.repository.list_statement_reviews(status="pending"):
+            if review.direction != "debit":
+                continue
+            self.repository.confirm_statement_review(review)
+            saved += 1
+
+        if not saved:
+            self._set_status("No debit transactions are ready to save.", is_error=True)
+            return
+
+        self._set_status(f"Saved {saved} debit transaction(s) from statements.", is_error=False)
+        self.refresh_reviews()
+        home_screen = self.manager.get_screen("list")
+        home_screen.show_saved_status(f"Saved {saved} statement transaction(s) to the main list.")
+        home_screen.refresh_expenses()
 
     def refresh_reviews(self) -> None:
         container = self.ids.review_container
         container.clear_widgets()
-        reviews = self.repository.list_notification_reviews(status="pending")
+        reviews = self._filtered_reviews()
 
         if not reviews:
             empty = Label(
-                text="No pending notifications yet.",
+                text="No pending statement rows yet.",
                 size_hint_y=None,
                 height=dp(54),
                 halign="center",
@@ -1614,8 +1703,8 @@ class NotificationsScreen(Screen):
         for review in reviews:
             container.add_widget(self._build_review_card(review))
 
-    def _build_review_card(self, review: NotificationReviewRecord) -> BoxLayout:
-        card = BoxLayout(orientation="vertical", spacing=dp(10), size_hint_y=None, height=dp(168), padding=dp(14))
+    def _build_review_card(self, review: StatementReviewRecord) -> BoxLayout:
+        card = BoxLayout(orientation="vertical", spacing=dp(10), size_hint_y=None, height=dp(188), padding=dp(14))
 
         def redraw_card(instance: BoxLayout, _value) -> None:
             from kivy.graphics import Color, RoundedRectangle
@@ -1628,24 +1717,36 @@ class NotificationsScreen(Screen):
         card.bind(pos=redraw_card, size=redraw_card)
         redraw_card(card, None)
 
-        header = BoxLayout(size_hint_y=None, height=dp(22))
+        header = BoxLayout(size_hint_y=None, height=dp(22), spacing=dp(8))
         source = Label(
-            text=review.source_app,
+            text=f"{review.bank_name} x{review.account_last4}",
             halign="left",
             valign="middle",
             color=(0.11, 0.31, 0.21, 1),
             bold=True,
         )
+        direction = Label(
+            text=review.direction.title(),
+            size_hint_x=None,
+            width=dp(74),
+            halign="center",
+            valign="middle",
+            color=(0.68, 0.24, 0.2, 1) if review.direction != "debit" else (0.11, 0.31, 0.21, 1),
+            bold=True,
+        )
         amount = Label(
             text=f"Rs. {review.amount:.2f}",
+            size_hint_x=None,
+            width=dp(104),
             halign="right",
             valign="middle",
             color=(0.11, 0.31, 0.21, 1),
             bold=True,
         )
-        source.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        amount.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        for widget in (source, direction, amount):
+            widget.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         header.add_widget(source)
+        header.add_widget(direction)
         header.add_widget(amount)
         card.add_widget(header)
 
@@ -1663,7 +1764,7 @@ class NotificationsScreen(Screen):
         card.add_widget(merchant)
 
         meta = Label(
-            text=f"{review.payment_method}  |  {review.expense_date}",
+            text=f"{review.payment_method}  |  {review.expense_date}  |  {review.source_file}",
             size_hint_y=None,
             height=dp(20),
             halign="left",
@@ -1673,18 +1774,18 @@ class NotificationsScreen(Screen):
         meta.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         card.add_widget(meta)
 
-        notes = Label(
-            text=review.notes,
+        raw_row = Label(
+            text=review.raw_row,
             size_hint_y=None,
-            height=dp(34),
+            height=dp(42),
             halign="left",
             valign="top",
             color=(0.47, 0.52, 0.49, 1),
             shorten=True,
             shorten_from="right",
         )
-        notes.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, instance.height)))
-        card.add_widget(notes)
+        raw_row.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, instance.height)))
+        card.add_widget(raw_row)
 
         actions = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(10))
         review_button = Button(
@@ -1695,10 +1796,11 @@ class NotificationsScreen(Screen):
             color=(0.13, 0.24, 0.19, 1),
         )
         save_button = Button(
-            text="Save",
+            text="Save" if review.direction == "debit" else "Debit Only",
+            disabled=review.direction != "debit",
             background_normal="",
             background_down="",
-            background_color=(0.21, 0.56, 0.39, 1),
+            background_color=(0.21, 0.56, 0.39, 1) if review.direction == "debit" else (0.7, 0.72, 0.71, 1),
             color=(1, 1, 1, 1),
         )
         reject_button = Button(
@@ -1718,52 +1820,72 @@ class NotificationsScreen(Screen):
         return card
 
     def open_review_popup(self, review_id: int) -> None:
-        review = self.repository.get_notification_review(review_id)
+        review = self.repository.get_statement_review(review_id)
         if review is None:
-            self._set_status("Notification review not found.", is_error=True)
+            self._set_status("Statement review not found.", is_error=True)
             self.refresh_reviews()
             return
 
         content = BoxLayout(orientation="vertical", spacing=dp(10), padding=dp(16))
         fields: dict[str, object] = {}
-        for label_text, key, value in (
-            ("Amount", "amount", f"{review.amount:.2f}"),
-            ("Merchant", "merchant", review.merchant),
-            ("Payment Method", "payment_method", review.payment_method),
-            ("Date", "expense_date", review.expense_date),
-        ):
-            label = Label(
-                text=label_text,
-                size_hint_y=None,
-                height=dp(18),
-                halign="left",
-                valign="middle",
-                color=(0.15, 0.18, 0.16, 1),
-            )
-            label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-            field = TextInput(
-                text=value,
-                size_hint_y=None,
-                height=dp(46),
-                multiline=False,
-            )
-            fields[key] = field
-            content.add_widget(label)
-            content.add_widget(field)
 
-        notes_label = Label(
-            text="Notes",
+        amount_label = Label(text="Amount", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        amount_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        amount_input = TextInput(text=f"{review.amount:.2f}", size_hint_y=None, height=dp(46), multiline=False)
+        fields["amount"] = amount_input
+        content.add_widget(amount_label)
+        content.add_widget(amount_input)
+
+        direction_label = Label(text="Transaction Direction", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        direction_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        direction_spinner = Spinner(
+            text=review.direction.title(),
+            values=["Debit", "Credit", "Unknown"],
             size_hint_y=None,
-            height=dp(18),
-            halign="left",
-            valign="middle",
+            height=dp(46),
+            background_normal="",
+            background_color=(1, 1, 1, 1),
             color=(0.15, 0.18, 0.16, 1),
         )
-        notes_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        notes_input = TextInput(text=review.notes, size_hint_y=None, height=dp(90))
-        fields["notes"] = notes_input
-        content.add_widget(notes_label)
-        content.add_widget(notes_input)
+        fields["direction"] = direction_spinner
+        content.add_widget(direction_label)
+        content.add_widget(direction_spinner)
+
+        merchant_label = Label(text="Merchant", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        merchant_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        merchant_input = TextInput(text=review.merchant, size_hint_y=None, height=dp(46), multiline=False)
+        fields["merchant"] = merchant_input
+        content.add_widget(merchant_label)
+        content.add_widget(merchant_input)
+
+        payment_label = Label(text="Payment Method", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        payment_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        payment_spinner = Spinner(
+            text=review.payment_method,
+            values=["UPI", "Card", "Cash", "NEFT", "IMPS", "ACH", "Bank Transfer", "Other"],
+            size_hint_y=None,
+            height=dp(46),
+            background_normal="",
+            background_color=(1, 1, 1, 1),
+            color=(0.15, 0.18, 0.16, 1),
+        )
+        fields["payment_method"] = payment_spinner
+        content.add_widget(payment_label)
+        content.add_widget(payment_spinner)
+
+        date_label = Label(text="Date", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        date_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        date_input = TextInput(text=review.expense_date, size_hint_y=None, height=dp(46), multiline=False)
+        fields["expense_date"] = date_input
+        content.add_widget(date_label)
+        content.add_widget(date_input)
+
+        raw_label = Label(text="Raw Row", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        raw_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        raw_input = TextInput(text=review.raw_row, readonly=True, size_hint_y=None, height=dp(110))
+        fields["raw_row"] = raw_input
+        content.add_widget(raw_label)
+        content.add_widget(raw_input)
 
         buttons = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
         cancel_button = Button(text="Cancel", background_normal="", background_down="", background_color=(0.46, 0.51, 0.49, 1), color=(1, 1, 1, 1))
@@ -1772,17 +1894,17 @@ class NotificationsScreen(Screen):
         buttons.add_widget(save_button)
         content.add_widget(buttons)
 
-        popup = Popup(title="Review Notification", content=content, size_hint=(0.92, None), height=dp(520), auto_dismiss=False)
+        popup = Popup(title="Review Statement Row", content=content, size_hint=(0.94, 0.9), auto_dismiss=False)
         cancel_button.bind(on_release=lambda _instance: popup.dismiss())
         save_button.bind(on_release=lambda _instance: self._save_review_changes(review, fields, popup))
         popup.open()
 
-    def _save_review_changes(self, review: NotificationReviewRecord, fields: dict[str, object], popup: Popup) -> None:
+    def _save_review_changes(self, review: StatementReviewRecord, fields: dict[str, object], popup: Popup) -> None:
         amount_text = str(fields["amount"].text).strip()
         merchant = " ".join(str(fields["merchant"].text).strip().split())
-        payment_method = " ".join(str(fields["payment_method"].text).strip().split())
+        payment_method = str(fields["payment_method"].text).strip()
         expense_date = str(fields["expense_date"].text).strip()
-        notes = " ".join(str(fields["notes"].text).strip().split())
+        direction = str(fields["direction"].text).strip().lower()
 
         if not amount_text or not merchant or not payment_method or not expense_date:
             self._set_status("Amount, merchant, payment method, and date are required.", is_error=True)
@@ -1791,66 +1913,89 @@ class NotificationsScreen(Screen):
         try:
             amount = float(amount_text)
         except ValueError:
-            self._set_status("Please enter a valid amount for this notification.", is_error=True)
+            self._set_status("Please enter a valid amount for this statement row.", is_error=True)
             return
 
         try:
             date.fromisoformat(expense_date)
         except ValueError:
-            self._set_status("Notification date must use YYYY-MM-DD.", is_error=True)
+            self._set_status("Statement date must use YYYY-MM-DD.", is_error=True)
             return
 
-        self.repository.update_notification_review(
-            NotificationReviewRecord(
+        self.repository.update_statement_review(
+            StatementReviewRecord(
                 id=review.id,
-                source_app=review.source_app,
-                raw_text=review.raw_text,
+                bank_name=review.bank_name,
+                account_last4=review.account_last4,
+                source_file=review.source_file,
                 amount=amount,
+                direction=direction,
                 merchant=merchant,
                 payment_method=payment_method,
                 expense_date=expense_date,
-                notes=notes,
+                reference_no=review.reference_no,
+                raw_row=review.raw_row,
                 status=review.status,
             )
         )
         popup.dismiss()
-        self._set_status("Notification updated. Review and save when ready.", is_error=False)
+        self._set_status("Statement row updated. Save only debit transactions when ready.", is_error=False)
         self.refresh_reviews()
 
     def save_review(self, review_id: int) -> None:
-        review = self.repository.get_notification_review(review_id)
+        review = self.repository.get_statement_review(review_id)
         if review is None:
-            self._set_status("Notification review not found.", is_error=True)
+            self._set_status("Statement review not found.", is_error=True)
             self.refresh_reviews()
             return
+        if review.direction != "debit":
+            self._set_status("Only debit transactions can be added to the main expense list.", is_error=True)
+            return
 
-        saved_expense = self.repository.confirm_notification_review(review)
-        self._set_status(f"Saved Rs. {saved_expense.amount:.2f} from notifications.", is_error=False)
+        saved_expense = self.repository.confirm_statement_review(review)
+        self._set_status(f"Saved Rs. {saved_expense.amount:.2f} from statements.", is_error=False)
         self.refresh_reviews()
         home_screen = self.manager.get_screen("list")
         home_screen.show_saved_status(f"Saved Rs. {saved_expense.amount:.2f} for {saved_expense.merchant}.")
         home_screen.refresh_expenses()
 
     def reject_review(self, review_id: int) -> None:
-        self.repository.reject_notification_review(review_id)
-        self._set_status("Notification removed from the review queue.", is_error=False)
+        self.repository.reject_statement_review(review_id)
+        self._set_status("Statement row removed from the review queue.", is_error=False)
         self.refresh_reviews()
+
+    def _filtered_reviews(self) -> list[StatementReviewRecord]:
+        reviews = self.repository.list_statement_reviews(status="pending")
+        filter_value = self.ids.direction_filter_input.text
+        if filter_value == "Debit Only":
+            return [review for review in reviews if review.direction == "debit"]
+        if filter_value == "Credit Only":
+            return [review for review in reviews if review.direction == "credit"]
+        return reviews
+
+    def _select_statement_path(self, chooser: FileChooserListView, popup: Popup) -> None:
+        selection = chooser.selection
+        if not selection:
+            self._set_status("Choose a PDF file first.", is_error=True)
+            return
+        self.ids.statement_path_input.text = selection[0]
+        popup.dismiss()
+        self._set_status(f"Selected {Path(selection[0]).name}. Import it when ready.", is_error=False)
+
+    def _default_statement_dir(self) -> Path:
+        candidates = [
+            Path.cwd() / "statements",
+            Path.home() / "Downloads",
+            Path("/storage/emulated/0/Download"),
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return Path.cwd()
 
     def _set_status(self, message: str, *, is_error: bool) -> None:
         self.status_message = message
         self.status_color = [0.98, 0.82, 0.78, 1] if is_error else [0.84, 0.93, 0.89, 1]
-
-    def _package_to_source(self, package_name: str) -> str:
-        lowered = package_name.lower()
-        if "gpay" in lowered or "google" in lowered:
-            return "Google Pay"
-        if "phonepe" in lowered:
-            return "PhonePe"
-        if "paytm" in lowered:
-            return "Paytm"
-        if "sms" in lowered:
-            return "Bank SMS"
-        return "Notification"
 
 
 class VisualizationScreen(Screen):
