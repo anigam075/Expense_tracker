@@ -1613,25 +1613,32 @@ class NotificationsScreen(Screen):
         self._set_status(f"Selected {Path(selection[0]).name}. Import it when ready.", is_error=False)
 
     def import_statement(self) -> None:
-        raw_path = self.ids.statement_path_input.text.strip()
-        if not raw_path:
-            self._set_status("Select or enter a statement PDF path first.", is_error=True)
-            return
-
-        materialized_path = materialize_selected_pdf(raw_path)
-        if materialized_path is None:
-            path = Path(raw_path).expanduser()
-        else:
-            path = materialized_path
-
-        if not path.exists() or path.suffix.lower() != ".pdf":
-            self._set_status("Please choose a valid PDF file.", is_error=True)
-            return
-
         try:
+            raw_path = self.ids.statement_path_input.text.strip()
+            if not raw_path:
+                self._set_status("Select or enter a statement PDF path first.", is_error=True)
+                return
+
+            materialized_path = materialize_selected_pdf(raw_path)
+            if materialized_path is None:
+                path = Path(raw_path).expanduser()
+            else:
+                path = materialized_path
+
+            if not path.exists() or path.suffix.lower() != ".pdf":
+                self._set_status("Please choose a valid PDF file.", is_error=True)
+                return
+
             result = parse_statement_pdf(path)
         except Exception as exc:
-            self._set_status(f"Unable to parse statement: {exc}", is_error=True)
+            app = App.get_running_app()
+            log_path = ""
+            if app is not None and hasattr(app, "_write_crash_log"):
+                log_path = app._write_crash_log(traceback.format_exc())
+            message = f"Unable to import statement: {type(exc).__name__}: {exc}"
+            if log_path:
+                message = f"{message} | Log: {log_path}"
+            self._set_status(message, is_error=True)
             return
 
         imported = 0
