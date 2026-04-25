@@ -8,11 +8,11 @@ from datetime import date
 from pathlib import Path
 
 from kivy.app import App
+from kivy.clock import Clock, mainthread
 from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.metrics import dp
 from kivy.properties import ListProperty, NumericProperty, ObjectProperty, StringProperty
-from kivy.clock import Clock, mainthread
 from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -26,9 +26,8 @@ from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
-from plyer import filechooser as plyer_filechooser
-
 from app.database import ExpenseRepository
+from app.android_bridge import materialize_selected_pdf, open_pdf_picker
 from app.models import ExpenseRecord, StatementReviewRecord
 from app.statement_parser import parse_statement_pdf
 
@@ -1557,16 +1556,12 @@ class NotificationsScreen(Screen):
 
     def open_file_browser(self) -> None:
         try:
-            plyer_filechooser.open_file(
-                title="Choose Statement PDF",
-                filters=["pdf"],
-                path=str(self._default_statement_dir()),
-                on_selection=self._handle_native_selection,
-            )
-            self._set_status("File manager opened. Choose a PDF statement there.", is_error=False)
-            return
+            if open_pdf_picker(self._handle_native_selection):
+                self._set_status("File manager opened. Choose a PDF statement there.", is_error=False)
+                return
         except Exception:
-            self._open_embedded_file_browser()
+            pass
+        self._open_embedded_file_browser()
 
     def _open_embedded_file_browser(self) -> None:
         chooser = FileChooserListView(
@@ -1623,7 +1618,12 @@ class NotificationsScreen(Screen):
             self._set_status("Select or enter a statement PDF path first.", is_error=True)
             return
 
-        path = Path(raw_path).expanduser()
+        materialized_path = materialize_selected_pdf(raw_path)
+        if materialized_path is None:
+            path = Path(raw_path).expanduser()
+        else:
+            path = materialized_path
+
         if not path.exists() or path.suffix.lower() != ".pdf":
             self._set_status("Please choose a valid PDF file.", is_error=True)
             return
