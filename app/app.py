@@ -12,6 +12,7 @@ from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.metrics import dp
 from kivy.properties import ListProperty, NumericProperty, ObjectProperty, StringProperty
+from kivy.clock import Clock, mainthread
 from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -1558,7 +1559,7 @@ class NotificationsScreen(Screen):
         try:
             plyer_filechooser.open_file(
                 title="Choose Statement PDF",
-                filters=["*.pdf"],
+                filters=["pdf"],
                 path=str(self._default_statement_dir()),
                 on_selection=self._handle_native_selection,
             )
@@ -1607,6 +1608,10 @@ class NotificationsScreen(Screen):
         popup.open()
 
     def _handle_native_selection(self, selection: list[str] | tuple[str, ...]) -> None:
+        Clock.schedule_once(lambda _dt: self._apply_native_selection(selection), 0)
+
+    @mainthread
+    def _apply_native_selection(self, selection: list[str] | tuple[str, ...]) -> None:
         if not selection:
             return
         self.ids.statement_path_input.text = str(selection[0])
