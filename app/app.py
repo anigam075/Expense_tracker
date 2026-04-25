@@ -415,7 +415,7 @@ KV = """
         BoxLayout:
             orientation: "vertical"
             size_hint_y: None
-            height: "286dp"
+            height: "304dp"
             padding: "18dp"
             spacing: "12dp"
             canvas.before:
@@ -440,7 +440,7 @@ KV = """
             Label:
                 text: "Upload a bank statement PDF, review imported rows, and save only the debit transactions."
                 size_hint_y: None
-                height: "44dp"
+                height: "54dp"
                 halign: "left"
                 valign: "top"
                 text_size: self.width, None
@@ -449,10 +449,10 @@ KV = """
             Label:
                 text: root.status_message
                 size_hint_y: None
-                height: "22dp"
+                height: "54dp"
                 halign: "left"
-                valign: "middle"
-                text_size: self.width, self.height
+                valign: "top"
+                text_size: self.width, None
                 color: root.status_color
 
             BoxLayout:
@@ -498,21 +498,7 @@ KV = """
                 height: "44dp"
                 spacing: "10dp"
 
-                Spinner:
-                    id: bulk_method_input
-                    text: "Bulk Method"
-                    values: ["Bulk Method", "UPI", "Card", "Cash", "NEFT", "IMPS", "ACH", "Bank Transfer", "Other"]
-                    background_normal: ""
-                    background_color: 0.95, 0.96, 0.95, 1
-                    color: 0.14, 0.18, 0.16, 1
-
-                Button:
-                    text: "Apply To Pending"
-                    background_normal: ""
-                    background_down: ""
-                    background_color: 0.93, 0.95, 0.94, 1
-                    color: 0.14, 0.18, 0.16, 1
-                    on_release: root.apply_bulk_method()
+                Widget:
 
                 Button:
                     text: "Save All Debits"
@@ -545,7 +531,7 @@ KV = """
                 Spinner:
                     id: direction_filter_input
                     size_hint_x: None
-                    width: "152dp"
+                    width: "170dp"
                     text: "All Directions"
                     values: ["All Directions", "Debit Only", "Credit Only"]
                     background_normal: ""
@@ -1667,35 +1653,6 @@ class NotificationsScreen(Screen):
         )
         self.refresh_reviews()
 
-    def apply_bulk_method(self) -> None:
-        method = self.ids.bulk_method_input.text.strip()
-        if method == "Bulk Method":
-            self._set_status("Choose a payment method to apply.", is_error=True)
-            return
-
-        updated = 0
-        for review in self._filtered_reviews():
-            self.repository.update_statement_review(
-                StatementReviewRecord(
-                    id=review.id,
-                    bank_name=review.bank_name,
-                    account_last4=review.account_last4,
-                    source_file=review.source_file,
-                    amount=review.amount,
-                    direction=review.direction,
-                    merchant=review.merchant,
-                    payment_method=method,
-                    expense_date=review.expense_date,
-                    reference_no=review.reference_no,
-                    raw_row=review.raw_row,
-                    status=review.status,
-                )
-            )
-            updated += 1
-
-        self._set_status(f"Applied {method} to {updated} pending row(s).", is_error=False)
-        self.refresh_reviews()
-
     def save_all_debits(self) -> None:
         saved = 0
         for review in self.repository.list_statement_reviews(status="pending"):
@@ -1736,7 +1693,7 @@ class NotificationsScreen(Screen):
             container.add_widget(self._build_review_card(review))
 
     def _build_review_card(self, review: StatementReviewRecord) -> BoxLayout:
-        card = BoxLayout(orientation="vertical", spacing=dp(10), size_hint_y=None, height=dp(188), padding=dp(14))
+        card = BoxLayout(orientation="vertical", spacing=dp(10), size_hint_y=None, height=dp(232), padding=dp(14))
 
         def redraw_card(instance: BoxLayout, _value) -> None:
             from kivy.graphics import Color, RoundedRectangle
@@ -1749,31 +1706,34 @@ class NotificationsScreen(Screen):
         card.bind(pos=redraw_card, size=redraw_card)
         redraw_card(card, None)
 
-        header = BoxLayout(size_hint_y=None, height=dp(22), spacing=dp(8))
+        header = BoxLayout(size_hint_y=None, height=dp(28), spacing=dp(8))
         source = Label(
             text=f"{review.bank_name} x{review.account_last4}",
             halign="left",
             valign="middle",
             color=(0.11, 0.31, 0.21, 1),
             bold=True,
+            font_size="16sp",
         )
         direction = Label(
             text=review.direction.title(),
             size_hint_x=None,
-            width=dp(74),
+            width=dp(86),
             halign="center",
             valign="middle",
             color=(0.68, 0.24, 0.2, 1) if review.direction != "debit" else (0.11, 0.31, 0.21, 1),
             bold=True,
+            font_size="15sp",
         )
         amount = Label(
             text=f"Rs. {review.amount:.2f}",
             size_hint_x=None,
-            width=dp(104),
+            width=dp(118),
             halign="right",
             valign="middle",
             color=(0.11, 0.31, 0.21, 1),
             bold=True,
+            font_size="16sp",
         )
         for widget in (source, direction, amount):
             widget.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
@@ -1785,10 +1745,10 @@ class NotificationsScreen(Screen):
         merchant = Label(
             text=review.merchant,
             size_hint_y=None,
-            height=dp(26),
+            height=dp(32),
             halign="left",
             valign="middle",
-            font_size="20sp",
+            font_size="21sp",
             bold=True,
             color=(0.15, 0.18, 0.16, 1),
         )
@@ -1798,10 +1758,11 @@ class NotificationsScreen(Screen):
         meta = Label(
             text=f"{review.payment_method}  |  {review.expense_date}  |  {review.source_file}",
             size_hint_y=None,
-            height=dp(20),
+            height=dp(24),
             halign="left",
             valign="middle",
             color=(0.47, 0.52, 0.49, 1),
+            font_size="14sp",
         )
         meta.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         card.add_widget(meta)
@@ -1809,23 +1770,25 @@ class NotificationsScreen(Screen):
         raw_row = Label(
             text=review.raw_row,
             size_hint_y=None,
-            height=dp(42),
+            height=dp(52),
             halign="left",
             valign="top",
             color=(0.47, 0.52, 0.49, 1),
             shorten=True,
             shorten_from="right",
+            font_size="14sp",
         )
         raw_row.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, instance.height)))
         card.add_widget(raw_row)
 
-        actions = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(10))
+        actions = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
         review_button = Button(
             text="Review",
             background_normal="",
             background_down="",
             background_color=(0.84, 0.92, 0.88, 1),
             color=(0.13, 0.24, 0.19, 1),
+            font_size="16sp",
         )
         save_button = Button(
             text="Save" if review.direction == "debit" else "Debit Only",
@@ -1834,6 +1797,7 @@ class NotificationsScreen(Screen):
             background_down="",
             background_color=(0.21, 0.56, 0.39, 1) if review.direction == "debit" else (0.7, 0.72, 0.71, 1),
             color=(1, 1, 1, 1),
+            font_size="16sp",
         )
         reject_button = Button(
             text="Reject",
@@ -1841,6 +1805,7 @@ class NotificationsScreen(Screen):
             background_down="",
             background_color=(0.68, 0.24, 0.2, 1),
             color=(1, 1, 1, 1),
+            font_size="16sp",
         )
         review_button.bind(on_release=lambda _instance: self.open_review_popup(review.id or 0))
         save_button.bind(on_release=lambda _instance: self.save_review(review.id or 0))
@@ -1859,16 +1824,26 @@ class NotificationsScreen(Screen):
             return
 
         content = BoxLayout(orientation="vertical", spacing=dp(10), padding=dp(16))
+        def redraw_content(instance: BoxLayout, _value) -> None:
+            from kivy.graphics import Color, RoundedRectangle
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(0.97, 0.95, 0.91, 1)
+                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[18, 18, 18, 18])
+
+        content.bind(pos=redraw_content, size=redraw_content)
+        redraw_content(content, None)
         fields: dict[str, object] = {}
 
-        amount_label = Label(text="Amount", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        amount_label = Label(text="Amount", size_hint_y=None, height=dp(22), halign="left", valign="middle", color=(0.17, 0.20, 0.18, 1), bold=True)
         amount_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         amount_input = TextInput(text=f"{review.amount:.2f}", size_hint_y=None, height=dp(46), multiline=False)
         fields["amount"] = amount_input
         content.add_widget(amount_label)
         content.add_widget(amount_input)
 
-        direction_label = Label(text="Transaction Direction", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        direction_label = Label(text="Transaction Direction", size_hint_y=None, height=dp(22), halign="left", valign="middle", color=(0.17, 0.20, 0.18, 1), bold=True)
         direction_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         direction_spinner = Spinner(
             text=review.direction.title(),
@@ -1883,14 +1858,14 @@ class NotificationsScreen(Screen):
         content.add_widget(direction_label)
         content.add_widget(direction_spinner)
 
-        merchant_label = Label(text="Merchant", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        merchant_label = Label(text="Merchant", size_hint_y=None, height=dp(22), halign="left", valign="middle", color=(0.17, 0.20, 0.18, 1), bold=True)
         merchant_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         merchant_input = TextInput(text=review.merchant, size_hint_y=None, height=dp(46), multiline=False)
         fields["merchant"] = merchant_input
         content.add_widget(merchant_label)
         content.add_widget(merchant_input)
 
-        payment_label = Label(text="Payment Method", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        payment_label = Label(text="Payment Method", size_hint_y=None, height=dp(22), halign="left", valign="middle", color=(0.17, 0.20, 0.18, 1), bold=True)
         payment_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         payment_spinner = Spinner(
             text=review.payment_method,
@@ -1905,14 +1880,14 @@ class NotificationsScreen(Screen):
         content.add_widget(payment_label)
         content.add_widget(payment_spinner)
 
-        date_label = Label(text="Date", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        date_label = Label(text="Date", size_hint_y=None, height=dp(22), halign="left", valign="middle", color=(0.17, 0.20, 0.18, 1), bold=True)
         date_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         date_input = TextInput(text=review.expense_date, size_hint_y=None, height=dp(46), multiline=False)
         fields["expense_date"] = date_input
         content.add_widget(date_label)
         content.add_widget(date_input)
 
-        raw_label = Label(text="Raw Row", size_hint_y=None, height=dp(18), halign="left", valign="middle", color=(0.15, 0.18, 0.16, 1))
+        raw_label = Label(text="Raw Row", size_hint_y=None, height=dp(22), halign="left", valign="middle", color=(0.17, 0.20, 0.18, 1), bold=True)
         raw_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         raw_input = TextInput(text=review.raw_row, readonly=True, size_hint_y=None, height=dp(110))
         fields["raw_row"] = raw_input
@@ -1926,7 +1901,7 @@ class NotificationsScreen(Screen):
         buttons.add_widget(save_button)
         content.add_widget(buttons)
 
-        popup = Popup(title="Review Statement Row", content=content, size_hint=(0.94, 0.9), auto_dismiss=False)
+        popup = Popup(title="Review Statement Row", content=content, size_hint=(0.94, 0.9), auto_dismiss=False, separator_color=(0.21, 0.56, 0.39, 1))
         cancel_button.bind(on_release=lambda _instance: popup.dismiss())
         save_button.bind(on_release=lambda _instance: self._save_review_changes(review, fields, popup))
         popup.open()
