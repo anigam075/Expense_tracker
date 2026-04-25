@@ -10,6 +10,7 @@ from kivy.utils import platform
 _PDF_PICKER_REQUEST_CODE = 48261
 _pdf_picker_callback = None
 _pdf_picker_bound = False
+_pdf_picker_flags = 0
 
 
 def open_notification_listener_settings() -> bool:
@@ -46,9 +47,11 @@ def open_pdf_picker(on_selection) -> bool:
     Intent = autoclass("android.content.Intent")
     String = autoclass("java.lang.String")
 
-    chooser_intent = Intent(Intent.ACTION_GET_CONTENT)
+    chooser_intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
     chooser_intent.setType("application/pdf")
     chooser_intent.addCategory(Intent.CATEGORY_OPENABLE)
+    chooser_intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    chooser_intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
 
     activity_instance = PythonActivity.mActivity
     activity_instance.startActivityForResult(
@@ -76,19 +79,28 @@ def materialize_selected_pdf(selection: str) -> Path | None:
     if platform != "android" or not raw.startswith("content://"):
         return None
 
-    from jnius import autoclass
-    from jnius import jarray
+    from jnius import autoclass, JavaException
 
     PythonActivity = autoclass("org.kivy.android.PythonActivity")
     Uri = autoclass("android.net.Uri")
-    FileOutputStream = autoclass("java.io.FileOutputStream")
+    Intent = autoclass("android.content.Intent")
 
     activity = PythonActivity.mActivity
     resolver = activity.getContentResolver()
     uri = Uri.parse(raw)
-    input_stream = resolver.openInputStream(uri)
+    try:
+        permission_flags = _pdf_picker_flags & Intent.FLAG_GRANT_READ_URI_PERMISSION
+        if permission_flags:
+            resolver.takePersistableUriPermission(uri, permission_flags)
+    except JavaException:
+        pass
+
+    try:
+        input_stream = resolver.openInputStream(uri)
+    except JavaException as exc:
+        raise RuntimeError(f"Could not open selected PDF URI: {exc}") from None
     if input_stream is None:
-        return None
+        raise RuntimeError("Could not open selected PDF URI.")
 
     app = App.get_running_app()
     if app is None:
@@ -98,25 +110,18 @@ def materialize_selected_pdf(selection: str) -> Path | None:
     imports_dir.mkdir(parents=True, exist_ok=True)
     destination = imports_dir / f"statement_{int(time.time() * 1000)}.pdf"
 
-    output_stream = None
     try:
-        output_stream = FileOutputStream(str(destination))
-        buffer = jarray.zeros(8192, "b")
-        while True:
-            count = input_stream.read(buffer)
-            if count == -1:
-                break
-            output_stream.write(buffer, 0, count)
+        with destination.open("wb") as output_stream:
+            while True:
+                value = input_stream.read()
+                if value == -1:
+                    break
+                output_stream.write(bytes((value,)))
     finally:
         try:
             input_stream.close()
         except Exception:
             pass
-        if output_stream is not None:
-            try:
-                output_stream.close()
-            except Exception:
-                pass
 
     return destination
 
@@ -153,6 +158,7 @@ def _on_pdf_picker_result(request_code, result_code, intent) -> None:
     if request_code != _PDF_PICKER_REQUEST_CODE:
         return
 
+    global _pdf_picker_flags
     callback = _pdf_picker_callback
     if callback is None:
         return
@@ -167,6 +173,7 @@ def _on_pdf_picker_result(request_code, result_code, intent) -> None:
             callback([])
             return
 
+        _pdf_picker_flags = intent.getFlags()
         callback([str(uri.toString())])
     except Exception:
         callback([])
