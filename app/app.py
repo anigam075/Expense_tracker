@@ -467,7 +467,7 @@ KV = """
                     color: 0.84, 0.93, 0.89, 1
                     font_size: "14sp"
                     shorten: True
-                    shorten_from: "middle"
+                    shorten_from: "center"
 
             BoxLayout:
                 size_hint_y: None
@@ -2367,7 +2367,7 @@ class ExpenseTrackerApp(App):
         try:
             Window.softinput_mode = "below_target"
             Builder.load_string(KV)
-            repository = ExpenseRepository(Path(self.user_data_dir) / "expenses.db")
+            repository = self._create_repository()
             root = ExpenseRoot(repository=repository)
             root.add_widget(ExpenseListScreen(repository=repository))
             root.add_widget(NotificationsScreen(repository=repository))
@@ -2383,7 +2383,29 @@ class ExpenseTrackerApp(App):
                 f"Crash log: {crash_path}\n\n"
                 f"{error_text}"
             )
-            return Label(text=message, halign="left", valign="top", text_size=(0, 0))
+            label = Label(text=message, halign="left", valign="top")
+            label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+            return label
+
+    def _create_repository(self) -> ExpenseRepository:
+        candidates = [
+            Path(self.user_data_dir) / "expenses.db",
+            Path.cwd() / "data" / "expenses.db",
+            Path(tempfile.gettempdir()) / "expense_tracker" / "expenses.db",
+        ]
+
+        last_error: Exception | None = None
+        for db_path in candidates:
+            try:
+                db_path.parent.mkdir(parents=True, exist_ok=True)
+                return ExpenseRepository(db_path)
+            except Exception as exc:
+                last_error = exc
+                continue
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Unable to initialize database.")
 
     def _write_crash_log(self, error_text: str) -> str:
         candidates: list[Path] = []
