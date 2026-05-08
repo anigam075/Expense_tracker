@@ -8,9 +8,16 @@ from kivy.app import App
 from kivy.utils import platform
 
 _PDF_PICKER_REQUEST_CODE = 48261
+_CSV_PICKER_REQUEST_CODE = 48262
+_CSV_CREATE_REQUEST_CODE = 48263
 _pdf_picker_callback = None
 _pdf_picker_bound = False
 _pdf_picker_flags = 0
+_csv_picker_callback = None
+_csv_picker_bound = False
+_csv_picker_flags = 0
+_csv_create_callback = None
+_csv_create_bound = False
 
 
 def open_notification_listener_settings() -> bool:
@@ -61,6 +68,70 @@ def open_pdf_picker(on_selection) -> bool:
         ),
         _PDF_PICKER_REQUEST_CODE,
     )
+    return True
+
+
+def open_csv_picker(on_selection) -> bool:
+    if platform != "android":
+        return False
+
+    from android import activity
+    from jnius import autoclass, cast
+
+    global _csv_picker_callback, _csv_picker_bound
+    _csv_picker_callback = on_selection
+
+    if not _csv_picker_bound:
+        activity.bind(on_activity_result=_on_csv_picker_result)
+        _csv_picker_bound = True
+
+    PythonActivity = autoclass("org.kivy.android.PythonActivity")
+    Intent = autoclass("android.content.Intent")
+    String = autoclass("java.lang.String")
+
+    chooser_intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+    chooser_intent.setType("text/*")
+    chooser_intent.addCategory(Intent.CATEGORY_OPENABLE)
+    chooser_intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    chooser_intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+
+    activity_instance = PythonActivity.mActivity
+    activity_instance.startActivityForResult(
+        Intent.createChooser(
+            chooser_intent,
+            cast("java.lang.CharSequence", String("Choose CSV File")),
+        ),
+        _CSV_PICKER_REQUEST_CODE,
+    )
+    return True
+
+
+def create_csv_document(on_selection, suggested_name: str) -> bool:
+    if platform != "android":
+        return False
+
+    from android import activity
+    from jnius import autoclass
+
+    global _csv_create_callback, _csv_create_bound
+    _csv_create_callback = on_selection
+
+    if not _csv_create_bound:
+        activity.bind(on_activity_result=_on_csv_create_result)
+        _csv_create_bound = True
+
+    PythonActivity = autoclass("org.kivy.android.PythonActivity")
+    Intent = autoclass("android.content.Intent")
+
+    create_intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+    create_intent.addCategory(Intent.CATEGORY_OPENABLE)
+    create_intent.setType("text/csv")
+    create_intent.putExtra(Intent.EXTRA_TITLE, suggested_name)
+    create_intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+    create_intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+
+    activity_instance = PythonActivity.mActivity
+    activity_instance.startActivityForResult(create_intent, _CSV_CREATE_REQUEST_CODE)
     return True
 
 
@@ -126,7 +197,122 @@ def materialize_selected_pdf(selection: str) -> Path | None:
     return destination
 
 
+def materialize_selected_csv(selection: str) -> Path | None:
+    return _materialize_selected_document(selection, prefix="transactions", extension=".csv", flags=_csv_picker_flags)
+
+
 def get_pdf_display_name(selection: str) -> str | None:
+    return _get_document_display_name(selection)
+
+
+def get_csv_display_name(selection: str) -> str | None:
+    return _get_document_display_name(selection)
+
+
+def write_csv_text_to_uri(selection: str, content: str) -> bool:
+    raw = str(selection).strip()
+    if not raw or platform != "android" or not raw.startswith("content://"):
+        return False
+
+    from jnius import autoclass, JavaException
+
+    PythonActivity = autoclass("org.kivy.android.PythonActivity")
+    Uri = autoclass("android.net.Uri")
+    Intent = autoclass("android.content.Intent")
+
+    activity = PythonActivity.mActivity
+    resolver = activity.getContentResolver()
+    uri = Uri.parse(raw)
+    try:
+        permission_flags = _csv_picker_flags & (
+            Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        )
+        if permission_flags:
+            resolver.takePersistableUriPermission(uri, permission_flags)
+    except JavaException:
+        pass
+
+    try:
+        output_stream = resolver.openOutputStream(uri, "wt")
+    except JavaException:
+        return False
+    if output_stream is None:
+        return False
+
+    try:
+        for value in content.encode("utf-8"):
+            output_stream.write(value)
+    finally:
+        try:
+            output_stream.close()
+        except Exception:
+            pass
+    return True
+
+
+def _materialize_selected_document(selection: str, *, prefix: str, extension: str, flags: int) -> Path | None:
+    if not selection:
+        return None
+
+    raw = str(selection).strip()
+    if not raw:
+        return None
+
+    direct_path = Path(raw)
+    if direct_path.exists():
+        return direct_path
+
+    if platform != "android" or not raw.startswith("content://"):
+        return None
+
+    from jnius import autoclass, JavaException
+
+    PythonActivity = autoclass("org.kivy.android.PythonActivity")
+    Uri = autoclass("android.net.Uri")
+    Intent = autoclass("android.content.Intent")
+
+    activity = PythonActivity.mActivity
+    resolver = activity.getContentResolver()
+    uri = Uri.parse(raw)
+    try:
+        permission_flags = flags & Intent.FLAG_GRANT_READ_URI_PERMISSION
+        if permission_flags:
+            resolver.takePersistableUriPermission(uri, permission_flags)
+    except JavaException:
+        pass
+
+    try:
+        input_stream = resolver.openInputStream(uri)
+    except JavaException as exc:
+        raise RuntimeError(f"Could not open selected file URI: {exc}") from None
+    if input_stream is None:
+        raise RuntimeError("Could not open selected file URI.")
+
+    app = App.get_running_app()
+    if app is None:
+        return None
+
+    imports_dir = Path(app.user_data_dir) / "imports"
+    imports_dir.mkdir(parents=True, exist_ok=True)
+    destination = imports_dir / f"{prefix}_{int(time.time() * 1000)}{extension}"
+
+    try:
+        with destination.open("wb") as output_stream:
+            while True:
+                value = input_stream.read()
+                if value == -1:
+                    break
+                output_stream.write(bytes((value,)))
+    finally:
+        try:
+            input_stream.close()
+        except Exception:
+            pass
+
+    return destination
+
+
+def _get_document_display_name(selection: str) -> str | None:
     raw = str(selection).strip()
     if not raw:
         return None
@@ -216,6 +402,56 @@ def _on_pdf_picker_result(request_code, result_code, intent) -> None:
             return
 
         _pdf_picker_flags = intent.getFlags()
+        callback([str(uri.toString())])
+    except Exception:
+        callback([])
+
+
+def _on_csv_picker_result(request_code, result_code, intent) -> None:
+    if request_code != _CSV_PICKER_REQUEST_CODE:
+        return
+
+    global _csv_picker_flags
+    callback = _csv_picker_callback
+    if callback is None:
+        return
+
+    try:
+        if intent is None:
+            callback([])
+            return
+
+        uri = intent.getData()
+        if uri is None:
+            callback([])
+            return
+
+        _csv_picker_flags = intent.getFlags()
+        callback([str(uri.toString())])
+    except Exception:
+        callback([])
+
+
+def _on_csv_create_result(request_code, result_code, intent) -> None:
+    if request_code != _CSV_CREATE_REQUEST_CODE:
+        return
+
+    global _csv_picker_flags
+    callback = _csv_create_callback
+    if callback is None:
+        return
+
+    try:
+        if intent is None:
+            callback([])
+            return
+
+        uri = intent.getData()
+        if uri is None:
+            callback([])
+            return
+
+        _csv_picker_flags = intent.getFlags()
         callback([str(uri.toString())])
     except Exception:
         callback([])

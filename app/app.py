@@ -5,6 +5,7 @@ from collections import defaultdict
 import re
 import tempfile
 import traceback
+from datetime import datetime
 from datetime import date
 from pathlib import Path
 from urllib.parse import unquote
@@ -28,8 +29,18 @@ from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
+from app.csv_transfer import CsvImportResult, export_transactions_csv, parse_transactions_csv, build_transactions_csv
 from app.database import ExpenseRepository
-from app.android_bridge import get_pdf_display_name, materialize_selected_pdf, open_pdf_picker
+from app.android_bridge import (
+    create_csv_document,
+    get_csv_display_name,
+    get_pdf_display_name,
+    materialize_selected_csv,
+    materialize_selected_pdf,
+    open_csv_picker,
+    open_pdf_picker,
+    write_csv_text_to_uri,
+)
 from app.models import ExpenseRecord, StatementReviewRecord
 from app.statement_parser import parse_statement_pdf
 
@@ -293,16 +304,30 @@ KV = """
                         bold: True
                         color: 1, 1, 1, 1
 
-            Button:
-                text: "View Visualization"
+            BoxLayout:
                 size_hint_y: None
                 height: "46dp"
-                background_normal: ""
-                background_down: ""
-                background_color: 0.84, 0.92, 0.88, 1
-                color: 0.13, 0.24, 0.19, 1
-                bold: True
-                on_release: root.open_visualization()
+                spacing: "10dp"
+
+                Button:
+                    text: "View Visualization"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.84, 0.92, 0.88, 1
+                    color: 0.13, 0.24, 0.19, 1
+                    bold: True
+                    on_release: root.open_visualization()
+
+                Button:
+                    text: "Data Transfer"
+                    size_hint_x: None
+                    width: "150dp"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.93, 0.95, 0.94, 1
+                    color: 0.14, 0.18, 0.16, 1
+                    bold: True
+                    on_release: root.open_data_transfer()
 
             Label:
                 text: root.status_message
@@ -1439,6 +1464,355 @@ class ExpenseListScreen(Screen):
         visualization_screen = self.manager.get_screen("visualization")
         visualization_screen.prepare_visualization()
         self.manager.current = "visualization"
+
+    def open_data_transfer(self) -> None:
+        content = BoxLayout(orientation="vertical", spacing=dp(14), padding=dp(16))
+
+        title = Label(
+            text="Data Transfer",
+            size_hint_y=None,
+            height=dp(28),
+            halign="left",
+            valign="middle",
+            font_size="22sp",
+            bold=True,
+            color=(0.14, 0.18, 0.16, 1),
+        )
+        title.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        subtitle = Label(
+            text="Export confirmed transactions to CSV or import them back from a CSV backup.",
+            size_hint_y=None,
+            height=dp(44),
+            halign="left",
+            valign="top",
+            color=(0.42, 0.47, 0.45, 1),
+        )
+        subtitle.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, None)))
+
+        actions = BoxLayout(size_hint_y=None, height=dp(52), spacing=dp(12))
+        export_button = Button(
+            text="Export CSV",
+            background_normal="",
+            background_down="",
+            background_color=(0.21, 0.56, 0.39, 1),
+            color=(1, 1, 1, 1),
+            bold=True,
+        )
+        import_button = Button(
+            text="Import CSV",
+            background_normal="",
+            background_down="",
+            background_color=(0.84, 0.92, 0.88, 1),
+            color=(0.13, 0.24, 0.19, 1),
+            bold=True,
+        )
+        actions.add_widget(export_button)
+        actions.add_widget(import_button)
+
+        status_label = Label(
+            text="Choose an action to back up or restore saved transactions.",
+            size_hint_y=None,
+            height=dp(56),
+            halign="left",
+            valign="top",
+            color=(0.42, 0.47, 0.45, 1),
+        )
+        status_label.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, None)))
+
+        close_button = Button(
+            text="Close",
+            size_hint_y=None,
+            height=dp(46),
+            background_normal="",
+            background_down="",
+            background_color=(0.46, 0.51, 0.49, 1),
+            color=(1, 1, 1, 1),
+        )
+
+        content.add_widget(title)
+        content.add_widget(subtitle)
+        content.add_widget(actions)
+        content.add_widget(status_label)
+        content.add_widget(close_button)
+
+        popup = Popup(
+            title="",
+            content=content,
+            size_hint=(0.9, 0.4),
+            auto_dismiss=False,
+            separator_height=0,
+        )
+
+        self._transfer_popup = popup
+        self._transfer_status_label = status_label
+
+        export_button.bind(on_release=lambda _instance: self._start_csv_export())
+        import_button.bind(on_release=lambda _instance: self._start_csv_import())
+        close_button.bind(on_release=lambda _instance: popup.dismiss())
+        popup.bind(on_dismiss=lambda _instance: self._clear_transfer_popup_state())
+        popup.open()
+
+    def _clear_transfer_popup_state(self) -> None:
+        self._transfer_popup = None
+        self._transfer_status_label = None
+
+    def _set_transfer_status(self, message: str, *, is_error: bool = False) -> None:
+        label = getattr(self, "_transfer_status_label", None)
+        if label is None:
+            return
+        label.text = message
+        label.color = (0.78, 0.24, 0.18, 1) if is_error else (0.42, 0.47, 0.45, 1)
+
+    def _start_csv_export(self) -> None:
+        expenses = self.repository.list_expenses(limit=None)
+        if not expenses:
+            self._set_transfer_status("No saved transactions are available to export.", is_error=True)
+            return
+
+        file_name = f"expenses_export_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.csv"
+        csv_text = build_transactions_csv(expenses)
+
+        if create_csv_document(self._handle_csv_export_destination, file_name):
+            self._pending_csv_export_text = csv_text
+            self._set_transfer_status("Choose where to save the CSV export.", is_error=False)
+            return
+
+        fallback_dir = Path.cwd() / "exports"
+        output_path = fallback_dir / file_name
+        export_transactions_csv(expenses, output_path)
+        self._set_transfer_status(f"Exported {len(expenses)} transaction(s) to {output_path.name}.", is_error=False)
+        self.show_saved_status(f"Exported CSV backup: {output_path.name}")
+
+    def _handle_csv_export_destination(self, selection: list[str] | tuple[str, ...]) -> None:
+        Clock.schedule_once(lambda _dt: self._apply_csv_export_destination(selection), 0)
+
+    @mainthread
+    def _apply_csv_export_destination(self, selection: list[str] | tuple[str, ...]) -> None:
+        csv_text = getattr(self, "_pending_csv_export_text", "")
+        if not selection or not csv_text:
+            self._set_transfer_status("CSV export was cancelled.", is_error=True)
+            self._pending_csv_export_text = ""
+            return
+
+        target = str(selection[0])
+        success = write_csv_text_to_uri(target, csv_text)
+        self._pending_csv_export_text = ""
+        if not success:
+            self._set_transfer_status("Could not write the CSV file to the chosen location.", is_error=True)
+            return
+
+        display_name = get_csv_display_name(target) or self._friendly_csv_name(target, fallback="transactions.csv")
+        self._set_transfer_status(f"Exported saved transactions to {display_name}.", is_error=False)
+        self.show_saved_status(f"Exported CSV backup: {display_name}")
+
+    def _start_csv_import(self) -> None:
+        try:
+            if open_csv_picker(self._handle_csv_import_selection):
+                self._set_transfer_status("File manager opened. Choose a CSV backup there.", is_error=False)
+                return
+        except Exception:
+            pass
+        self._open_embedded_csv_browser()
+
+    def _open_embedded_csv_browser(self) -> None:
+        chooser = FileChooserListView(
+            path=str(self._default_csv_dir()),
+            filters=["*.csv"],
+            multiselect=False,
+        )
+
+        actions = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
+        cancel_button = Button(
+            text="Cancel",
+            background_normal="",
+            background_down="",
+            background_color=(0.46, 0.51, 0.49, 1),
+            color=(1, 1, 1, 1),
+        )
+        select_button = Button(
+            text="Use CSV",
+            background_normal="",
+            background_down="",
+            background_color=(0.21, 0.56, 0.39, 1),
+            color=(1, 1, 1, 1),
+        )
+        actions.add_widget(cancel_button)
+        actions.add_widget(select_button)
+
+        content = BoxLayout(orientation="vertical", spacing=dp(12), padding=dp(14))
+        content.add_widget(chooser)
+        content.add_widget(actions)
+
+        popup = Popup(
+            title="Choose CSV Backup",
+            content=content,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False,
+        )
+        cancel_button.bind(on_release=lambda _instance: popup.dismiss())
+        select_button.bind(on_release=lambda _instance: self._select_csv_import_path(chooser, popup))
+        popup.open()
+
+    def _select_csv_import_path(self, chooser: FileChooserListView, popup: Popup) -> None:
+        selection = chooser.selection
+        if not selection:
+            self._set_transfer_status("Choose a CSV file first.", is_error=True)
+            return
+        popup.dismiss()
+        self._apply_csv_import_selection(selection)
+
+    def _handle_csv_import_selection(self, selection: list[str] | tuple[str, ...]) -> None:
+        Clock.schedule_once(lambda _dt: self._apply_csv_import_selection(selection), 0)
+
+    @mainthread
+    def _apply_csv_import_selection(self, selection: list[str] | tuple[str, ...]) -> None:
+        if not selection:
+            self._set_transfer_status("CSV import was cancelled.", is_error=True)
+            return
+
+        raw_path = str(selection[0]).strip()
+        display_name = get_csv_display_name(raw_path) or self._friendly_csv_name(raw_path)
+
+        try:
+            materialized_path = materialize_selected_csv(raw_path)
+            csv_path = materialized_path if materialized_path is not None else Path(raw_path).expanduser()
+            if not csv_path.exists() or csv_path.suffix.lower() != ".csv":
+                self._set_transfer_status("Please choose a valid CSV file.", is_error=True)
+                return
+            result = parse_transactions_csv(csv_path, self.repository.list_expenses(limit=None))
+        except Exception as exc:
+            self._set_transfer_status(f"Unable to read CSV: {type(exc).__name__}: {exc}", is_error=True)
+            return
+
+        self._set_transfer_status(f"Loaded CSV backup {display_name}. Review the import summary.", is_error=False)
+        self._open_csv_import_preview(result, display_name)
+
+    def _open_csv_import_preview(self, result: CsvImportResult, display_name: str) -> None:
+        content = BoxLayout(orientation="vertical", spacing=dp(12), padding=dp(16))
+
+        title = Label(
+            text="Import CSV Preview",
+            size_hint_y=None,
+            height=dp(28),
+            halign="left",
+            valign="middle",
+            font_size="20sp",
+            bold=True,
+            color=(0.14, 0.18, 0.16, 1),
+        )
+        title.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        summary = Label(
+            text=(
+                f"{display_name}\n\n"
+                f"Rows found: {result.total_rows}\n"
+                f"Ready to import: {len(result.importable_rows)}\n"
+                f"Possible duplicates skipped: {len(result.duplicate_rows)}\n"
+                f"Invalid rows skipped: {len(result.invalid_rows)}"
+            ),
+            size_hint_y=None,
+            height=dp(128),
+            halign="left",
+            valign="top",
+            color=(0.32, 0.36, 0.34, 1),
+        )
+        summary.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, None)))
+        content.add_widget(title)
+        content.add_widget(summary)
+
+        if result.missing_headers:
+            error_label = Label(
+                text="Missing headers: " + ", ".join(result.missing_headers),
+                size_hint_y=None,
+                height=dp(44),
+                halign="left",
+                valign="top",
+                color=(0.78, 0.24, 0.18, 1),
+            )
+            error_label.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, None)))
+            content.add_widget(error_label)
+        elif result.invalid_rows:
+            preview_text = "\n".join(
+                f"Row {issue.row_number}: {issue.message}" for issue in result.invalid_rows[:3]
+            )
+            invalid_label = Label(
+                text=preview_text,
+                size_hint_y=None,
+                height=dp(70),
+                halign="left",
+                valign="top",
+                color=(0.68, 0.24, 0.2, 1),
+            )
+            invalid_label.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, None)))
+            content.add_widget(invalid_label)
+
+        buttons = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
+        cancel_button = Button(
+            text="Cancel",
+            background_normal="",
+            background_down="",
+            background_color=(0.46, 0.51, 0.49, 1),
+            color=(1, 1, 1, 1),
+        )
+        import_button = Button(
+            text="Import Valid Rows",
+            disabled=bool(result.missing_headers or not result.importable_rows),
+            background_normal="",
+            background_down="",
+            background_color=(0.21, 0.56, 0.39, 1) if result.importable_rows and not result.missing_headers else (0.7, 0.72, 0.71, 1),
+            color=(1, 1, 1, 1),
+        )
+        buttons.add_widget(cancel_button)
+        buttons.add_widget(import_button)
+        content.add_widget(buttons)
+
+        popup = Popup(title="", content=content, size_hint=(0.9, 0.5), auto_dismiss=False, separator_height=0)
+        cancel_button.bind(on_release=lambda _instance: popup.dismiss())
+        import_button.bind(on_release=lambda _instance: self._commit_csv_import(result, popup))
+        popup.open()
+
+    def _commit_csv_import(self, result: CsvImportResult, popup: Popup) -> None:
+        imported = 0
+        for expense in result.importable_rows:
+            self.repository.add_expense(expense)
+            imported += 1
+
+        popup.dismiss()
+        self.refresh_expenses()
+        self.show_saved_status(f"Imported {imported} transaction(s) from CSV.")
+        self._set_transfer_status(
+            f"Imported {imported} row(s). Skipped {len(result.duplicate_rows)} duplicates and {len(result.invalid_rows)} invalid rows.",
+            is_error=False,
+        )
+
+    def _default_csv_dir(self) -> Path:
+        candidates = [
+            Path.cwd() / "exports",
+            Path.cwd() / "statements",
+            Path.home() / "Downloads",
+            Path("/storage/emulated/0/Download"),
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return Path.cwd()
+
+    def _friendly_csv_name(self, raw_path: str, fallback: str = "") -> str:
+        display_name = get_csv_display_name(raw_path)
+        if display_name:
+            return display_name
+
+        decoded = unquote(str(raw_path).strip())
+        matches = re.findall(r"([^/\\?#]+\.csv)\b", decoded, flags=re.IGNORECASE)
+        if matches:
+            return matches[-1]
+
+        document_match = re.search(r"(?:document:|document%3A)([^/?#]+)$", str(raw_path), flags=re.IGNORECASE)
+        if document_match:
+            return f"{document_match.group(1)}.csv"
+
+        if fallback:
+            return fallback
+        return "transactions.csv"
 
     def _refresh_empty_card(self, instance: BoxLayout) -> None:
         from kivy.graphics import Color, RoundedRectangle
