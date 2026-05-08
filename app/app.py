@@ -415,7 +415,7 @@ KV = """
         BoxLayout:
             orientation: "vertical"
             size_hint_y: None
-            height: "304dp"
+            height: "286dp"
             padding: "18dp"
             spacing: "12dp"
             canvas.before:
@@ -457,19 +457,17 @@ KV = """
 
             BoxLayout:
                 size_hint_y: None
-                height: "48dp"
-                spacing: "10dp"
+                height: "38dp"
 
-                TextInput:
-                    id: statement_path_input
-                    hint_text: "Statement PDF path"
-                    multiline: False
-                    background_normal: ""
-                    background_active: ""
-                    background_color: 0.95, 0.96, 0.95, 1
-                    foreground_color: 0.14, 0.18, 0.16, 1
-                    cursor_color: 0.18, 0.5, 0.32, 1
-                    padding: "12dp", "12dp"
+                Label:
+                    text: root.selected_file_label
+                    halign: "left"
+                    valign: "middle"
+                    text_size: self.width, self.height
+                    color: 0.84, 0.93, 0.89, 1
+                    font_size: "14sp"
+                    shorten: True
+                    shorten_from: "middle"
 
             BoxLayout:
                 size_hint_y: None
@@ -485,7 +483,7 @@ KV = """
                     on_release: root.open_file_browser()
 
                 Button:
-                    text: "Import Statement"
+                    text: "Upload"
                     background_normal: ""
                     background_down: ""
                     background_color: 0.84, 0.92, 0.88, 1
@@ -1033,6 +1031,20 @@ class ExpenseRow(BoxLayout):
         return super().on_touch_up(touch)
 
 
+class ReviewPopupContent(BoxLayout):
+    selectable_input = ObjectProperty(allownone=True)
+
+    def on_touch_down(self, touch):
+        if (
+            self.selectable_input is not None
+            and self.selectable_input.selection_text
+            and not self.selectable_input.collide_point(*touch.pos)
+        ):
+            self.selectable_input.cancel_selection()
+            self.selectable_input.focus = False
+        return super().on_touch_down(touch)
+
+
 class DatePickerPopup(Popup):
     selected_date = ObjectProperty(allownone=False)
     on_select = ObjectProperty(allownone=False)
@@ -1535,6 +1547,8 @@ class NotificationsScreen(Screen):
     repository = ObjectProperty(allownone=False)
     status_message = StringProperty("Select a statement PDF, import it, and review the rows before saving.")
     status_color = ListProperty([0.84, 0.93, 0.89, 1])
+    selected_statement_path = StringProperty("")
+    selected_file_label = StringProperty("No PDF selected yet.")
 
     def on_pre_enter(self, *args) -> None:
         self.refresh_reviews()
@@ -1595,14 +1609,15 @@ class NotificationsScreen(Screen):
     def _apply_native_selection(self, selection: list[str] | tuple[str, ...]) -> None:
         if not selection:
             return
-        self.ids.statement_path_input.text = str(selection[0])
+        self.selected_statement_path = str(selection[0])
         self._set_status(f"Selected {Path(selection[0]).name}. Import it when ready.", is_error=False)
+        self.selected_file_label = f"Selected: {Path(selection[0]).name}"
 
     def import_statement(self) -> None:
         try:
-            raw_path = self.ids.statement_path_input.text.strip()
+            raw_path = self.selected_statement_path.strip()
             if not raw_path:
-                self._set_status("Select or enter a statement PDF path first.", is_error=True)
+                self._set_status("Choose a statement PDF first.", is_error=True)
                 return
 
             materialized_path = materialize_selected_pdf(raw_path)
@@ -1693,7 +1708,8 @@ class NotificationsScreen(Screen):
             container.add_widget(self._build_review_card(review))
 
     def _build_review_card(self, review: StatementReviewRecord) -> BoxLayout:
-        card = BoxLayout(orientation="vertical", spacing=dp(10), size_hint_y=None, height=dp(232), padding=dp(14))
+        card = BoxLayout(size_hint_y=None, height=dp(214), padding=(0, 0, 0, dp(6)))
+        surface = BoxLayout(orientation="vertical", spacing=dp(8), padding=dp(14))
 
         def redraw_card(instance: BoxLayout, _value) -> None:
             from kivy.graphics import Color, RoundedRectangle
@@ -1703,8 +1719,8 @@ class NotificationsScreen(Screen):
                 Color(1, 1, 1, 1)
                 RoundedRectangle(pos=instance.pos, size=instance.size, radius=[22, 22, 22, 22])
 
-        card.bind(pos=redraw_card, size=redraw_card)
-        redraw_card(card, None)
+        surface.bind(pos=redraw_card, size=redraw_card)
+        redraw_card(surface, None)
 
         header = BoxLayout(size_hint_y=None, height=dp(28), spacing=dp(8))
         source = Label(
@@ -1740,7 +1756,7 @@ class NotificationsScreen(Screen):
         header.add_widget(source)
         header.add_widget(direction)
         header.add_widget(amount)
-        card.add_widget(header)
+        surface.add_widget(header)
 
         merchant = Label(
             text=review.merchant,
@@ -1753,7 +1769,7 @@ class NotificationsScreen(Screen):
             color=(0.15, 0.18, 0.16, 1),
         )
         merchant.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        card.add_widget(merchant)
+        surface.add_widget(merchant)
 
         meta = Label(
             text=f"{review.payment_method}  |  {review.expense_date}  |  {review.source_file}",
@@ -1765,7 +1781,7 @@ class NotificationsScreen(Screen):
             font_size="14sp",
         )
         meta.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        card.add_widget(meta)
+        surface.add_widget(meta)
 
         raw_row = Label(
             text=review.raw_row,
@@ -1779,7 +1795,7 @@ class NotificationsScreen(Screen):
             font_size="14sp",
         )
         raw_row.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, instance.height)))
-        card.add_widget(raw_row)
+        surface.add_widget(raw_row)
 
         actions = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
         review_button = Button(
@@ -1813,7 +1829,8 @@ class NotificationsScreen(Screen):
         actions.add_widget(review_button)
         actions.add_widget(save_button)
         actions.add_widget(reject_button)
-        card.add_widget(actions)
+        surface.add_widget(actions)
+        card.add_widget(surface)
         return card
 
     def open_review_popup(self, review_id: int) -> None:
@@ -1823,7 +1840,7 @@ class NotificationsScreen(Screen):
             self.refresh_reviews()
             return
 
-        content = BoxLayout(orientation="vertical", spacing=dp(10), padding=dp(16))
+        content = ReviewPopupContent(orientation="vertical", spacing=dp(10), padding=dp(16))
         def redraw_content(instance: BoxLayout, _value) -> None:
             from kivy.graphics import Color, RoundedRectangle
 
@@ -1889,10 +1906,37 @@ class NotificationsScreen(Screen):
 
         raw_label = Label(text="Raw Row", size_hint_y=None, height=dp(22), halign="left", valign="middle", color=(0.17, 0.20, 0.18, 1), bold=True)
         raw_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
-        raw_input = TextInput(text=review.raw_row, readonly=True, size_hint_y=None, height=dp(110))
+        raw_box = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(128), spacing=dp(8), padding=(dp(10), dp(10), dp(10), dp(10)))
+
+        def redraw_raw_box(instance: BoxLayout, _value) -> None:
+            from kivy.graphics import Color, RoundedRectangle
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(1, 1, 1, 1)
+                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[12, 12, 12, 12])
+
+        raw_box.bind(pos=redraw_raw_box, size=redraw_raw_box)
+        redraw_raw_box(raw_box, None)
+
+        raw_input = TextInput(
+            text=review.raw_row,
+            readonly=True,
+            multiline=True,
+            size_hint_y=None,
+            height=dp(108),
+            background_normal="",
+            background_active="",
+            background_color=(1, 1, 1, 1),
+            foreground_color=(0.18, 0.22, 0.2, 1),
+            cursor_color=(0.18, 0.22, 0.2, 1),
+        )
         fields["raw_row"] = raw_input
+        raw_input.bind(focus=lambda instance, value: not value and instance.cancel_selection())
+        raw_box.add_widget(raw_input)
         content.add_widget(raw_label)
-        content.add_widget(raw_input)
+        content.add_widget(raw_box)
+        content.selectable_input = raw_input
 
         buttons = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(10))
         cancel_button = Button(text="Cancel", background_normal="", background_down="", background_color=(0.46, 0.51, 0.49, 1), color=(1, 1, 1, 1))
@@ -1985,7 +2029,8 @@ class NotificationsScreen(Screen):
         if not selection:
             self._set_status("Choose a PDF file first.", is_error=True)
             return
-        self.ids.statement_path_input.text = selection[0]
+        self.selected_statement_path = selection[0]
+        self.selected_file_label = f"Selected: {Path(selection[0]).name}"
         popup.dismiss()
         self._set_status(f"Selected {Path(selection[0]).name}. Import it when ready.", is_error=False)
 
@@ -2003,6 +2048,7 @@ class NotificationsScreen(Screen):
     def _set_status(self, message: str, *, is_error: bool) -> None:
         self.status_message = message
         self.status_color = [0.98, 0.82, 0.78, 1] if is_error else [0.84, 0.93, 0.89, 1]
+
 
 
 class VisualizationScreen(Screen):
