@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import calendar
 from collections import defaultdict
+import re
 import tempfile
 import traceback
 from datetime import date
 from pathlib import Path
+from urllib.parse import unquote
 
 from kivy.app import App
 from kivy.clock import Clock, mainthread
@@ -27,7 +29,7 @@ from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
 from app.database import ExpenseRepository
-from app.android_bridge import materialize_selected_pdf, open_pdf_picker
+from app.android_bridge import get_pdf_display_name, materialize_selected_pdf, open_pdf_picker
 from app.models import ExpenseRecord, StatementReviewRecord
 from app.statement_parser import parse_statement_pdf
 
@@ -188,6 +190,8 @@ KV = """
     name: "list"
     BoxLayout:
         orientation: "vertical"
+        padding: "14dp"
+        spacing: "14dp"
         canvas.before:
             Color:
                 rgba: 0.97, 0.95, 0.91, 1
@@ -207,7 +211,7 @@ KV = """
                 RoundedRectangle:
                     pos: self.pos
                     size: self.size
-                    radius: [0, 0, 30, 30]
+                    radius: [24, 24, 24, 24]
 
             Label:
                 text: "Expense Atlas"
@@ -311,8 +315,15 @@ KV = """
 
         BoxLayout:
             orientation: "vertical"
-            padding: "18dp"
+            padding: "14dp"
             spacing: "14dp"
+            canvas.before:
+                Color:
+                    rgba: 0.98, 0.97, 0.95, 1
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [24, 24, 24, 24]
 
             BoxLayout:
                 size_hint_y: None
@@ -420,7 +431,7 @@ KV = """
             BoxLayout:
                 orientation: "vertical"
                 size_hint_y: None
-                height: "250dp"
+                height: "220dp"
                 padding: "18dp"
                 spacing: "10dp"
                 canvas.before:
@@ -431,25 +442,30 @@ KV = """
                         size: self.size
                         radius: [24, 24, 24, 24]
 
-                Label:
-                    text: "Statements"
+                BoxLayout:
                     size_hint_y: None
-                    height: "34dp"
-                    halign: "left"
-                    valign: "middle"
-                    text_size: self.width, self.height
-                    font_size: "30sp"
-                    bold: True
-                    color: 1, 1, 1, 1
+                    height: "36dp"
+                    spacing: "10dp"
 
-                Label:
-                    text: "Upload a bank statement PDF and review each parsed row before saving."
-                    size_hint_y: None
-                    height: "44dp"
-                    halign: "left"
-                    valign: "top"
-                    text_size: self.width, None
-                    color: 0.84, 0.93, 0.89, 1
+                    Label:
+                        text: "Statement Review"
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.size
+                        font_size: "28sp"
+                        bold: True
+                        color: 1, 1, 1, 1
+
+                    Button:
+                        text: "i"
+                        size_hint: None, None
+                        size: "30dp", "30dp"
+                        background_normal: ""
+                        background_down: ""
+                        background_color: 0.84, 0.92, 0.88, 1
+                        color: 0.13, 0.24, 0.19, 1
+                        bold: True
+                        on_release: root.open_info_tooltip()
 
                 Label:
                     text: root.status_message
@@ -1559,6 +1575,7 @@ class NotificationsScreen(Screen):
     status_color = ListProperty([0.84, 0.93, 0.89, 1])
     selected_statement_path = StringProperty("")
     selected_file_label = StringProperty("No PDF selected yet.")
+    selected_source_name = StringProperty("")
 
     def on_pre_enter(self, *args) -> None:
         self.refresh_reviews()
@@ -1619,9 +1636,12 @@ class NotificationsScreen(Screen):
     def _apply_native_selection(self, selection: list[str] | tuple[str, ...]) -> None:
         if not selection:
             return
-        self.selected_statement_path = str(selection[0])
-        self._set_status(f"Selected {Path(selection[0]).name}. Import it when ready.", is_error=False)
-        self.selected_file_label = f"Selected: {Path(selection[0]).name}"
+        selected_path = str(selection[0])
+        display_name = self._friendly_pdf_name(selected_path)
+        self.selected_statement_path = selected_path
+        self.selected_source_name = display_name
+        self._set_status(f"Selected {display_name}. Tap Upload when ready.", is_error=False)
+        self.selected_file_label = display_name
 
     def import_statement(self) -> None:
         try:
@@ -1653,13 +1673,14 @@ class NotificationsScreen(Screen):
             return
 
         imported = 0
+        source_name = self.selected_source_name or self._friendly_pdf_name(raw_path, fallback=path.name)
         for txn in result.transactions:
             self.repository.add_statement_review(
                 StatementReviewRecord(
                     id=None,
                     bank_name=result.bank_name,
                     account_last4=result.account_last4,
-                    source_file=path.name,
+                    source_file=source_name,
                     amount=txn.amount,
                     direction=txn.direction,
                     merchant=txn.merchant,
@@ -1677,6 +1698,7 @@ class NotificationsScreen(Screen):
             is_error=False,
         )
         self.selected_statement_path = ""
+        self.selected_source_name = ""
         self.selected_file_label = "No PDF selected yet."
         self.refresh_reviews()
 
@@ -2051,10 +2073,13 @@ class NotificationsScreen(Screen):
         if not selection:
             self._set_status("Choose a PDF file first.", is_error=True)
             return
-        self.selected_statement_path = selection[0]
-        self.selected_file_label = f"Selected: {Path(selection[0]).name}"
+        selected_path = selection[0]
+        display_name = self._friendly_pdf_name(selected_path)
+        self.selected_statement_path = selected_path
+        self.selected_source_name = display_name
+        self.selected_file_label = display_name
         popup.dismiss()
-        self._set_status(f"Selected {Path(selection[0]).name}. Import it when ready.", is_error=False)
+        self._set_status(f"Selected {display_name}. Tap Upload when ready.", is_error=False)
 
     def _default_statement_dir(self) -> Path:
         candidates = [
@@ -2070,6 +2095,74 @@ class NotificationsScreen(Screen):
     def _set_status(self, message: str, *, is_error: bool) -> None:
         self.status_message = message
         self.status_color = [0.98, 0.82, 0.78, 1] if is_error else [0.84, 0.93, 0.89, 1]
+
+    def open_info_tooltip(self) -> None:
+        outer = BoxLayout(orientation="vertical", spacing=dp(12), padding=dp(14))
+
+        header = BoxLayout(size_hint_y=None, height=dp(34), spacing=dp(10))
+        title = Label(
+            text="How It Works",
+            halign="left",
+            valign="middle",
+            color=(0.14, 0.18, 0.16, 1),
+            font_size="18sp",
+            bold=True,
+        )
+        title.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        close_button = Button(
+            text="X",
+            size_hint=(None, None),
+            size=(dp(32), dp(32)),
+            background_normal="",
+            background_down="",
+            background_color=(0.92, 0.94, 0.93, 1),
+            color=(0.22, 0.26, 0.24, 1),
+        )
+        header.add_widget(title)
+        header.add_widget(close_button)
+        outer.add_widget(header)
+
+        body = Label(
+            text=(
+                "Choose a bank statement PDF, upload it, review the parsed rows, "
+                "and save only debit transactions to the main expense list."
+            ),
+            halign="left",
+            valign="top",
+            color=(0.18, 0.22, 0.2, 1),
+            font_size="15sp",
+        )
+        body.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, None)))
+        outer.add_widget(body)
+
+        popup = Popup(
+            title="",
+            content=outer,
+            size_hint=(0.82, 0.34),
+            auto_dismiss=False,
+            separator_height=0,
+        )
+        close_button.bind(on_release=lambda _instance: popup.dismiss())
+        popup.open()
+
+    def _friendly_pdf_name(self, raw_path: str, fallback: str = "") -> str:
+        display_name = get_pdf_display_name(raw_path)
+        if display_name:
+            return display_name
+
+        decoded = unquote(str(raw_path).strip())
+        matches = re.findall(r'([^/\\?#]+\.pdf)\b', decoded, flags=re.IGNORECASE)
+        if matches:
+            return matches[-1]
+
+        document_match = re.search(r'(?:document:|document%3A)([^/?#]+)$', str(raw_path), flags=re.IGNORECASE)
+        if document_match:
+            return f"{document_match.group(1)}.pdf"
+
+        if fallback:
+            return fallback
+
+        return "selected_statement.pdf"
 
 
 

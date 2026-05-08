@@ -126,6 +126,48 @@ def materialize_selected_pdf(selection: str) -> Path | None:
     return destination
 
 
+def get_pdf_display_name(selection: str) -> str | None:
+    raw = str(selection).strip()
+    if not raw:
+        return None
+
+    direct_path = Path(raw)
+    if direct_path.exists():
+        return direct_path.name
+
+    if platform != "android" or not raw.startswith("content://"):
+        return None
+
+    from jnius import autoclass, JavaException
+
+    PythonActivity = autoclass("org.kivy.android.PythonActivity")
+    Uri = autoclass("android.net.Uri")
+    OpenableColumns = autoclass("android.provider.OpenableColumns")
+
+    activity = PythonActivity.mActivity
+    resolver = activity.getContentResolver()
+    uri = Uri.parse(raw)
+
+    cursor = None
+    try:
+        cursor = resolver.query(uri, None, None, None, None)
+        if cursor is None or not cursor.moveToFirst():
+            return None
+        column_index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if column_index < 0:
+            return None
+        display_name = cursor.getString(column_index)
+        return str(display_name) if display_name else None
+    except JavaException:
+        return None
+    finally:
+        if cursor is not None:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+
+
 def read_captured_notifications() -> tuple[list[dict[str, object]], int]:
     path = _notification_file_path()
     if path is None or not path.exists():
