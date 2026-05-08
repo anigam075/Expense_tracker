@@ -414,53 +414,56 @@ KV = """
 
         BoxLayout:
             orientation: "vertical"
-            size_hint_y: None
-            height: "286dp"
-            padding: "18dp"
-            spacing: "12dp"
-            canvas.before:
-                Color:
-                    rgba: 0.14, 0.35, 0.27, 1
-                RoundedRectangle:
-                    pos: self.pos
-                    size: self.size
-                    radius: [0, 0, 30, 30]
-
-            Label:
-                text: "Statements"
-                size_hint_y: None
-                height: "34dp"
-                halign: "left"
-                valign: "middle"
-                text_size: self.width, self.height
-                font_size: "30sp"
-                bold: True
-                color: 1, 1, 1, 1
-
-            Label:
-                text: "Upload a bank statement PDF, review imported rows, and save only the debit transactions."
-                size_hint_y: None
-                height: "54dp"
-                halign: "left"
-                valign: "top"
-                text_size: self.width, None
-                color: 0.84, 0.93, 0.89, 1
-
-            Label:
-                text: root.status_message
-                size_hint_y: None
-                height: "54dp"
-                halign: "left"
-                valign: "top"
-                text_size: self.width, None
-                color: root.status_color
+            padding: "14dp"
+            spacing: "14dp"
 
             BoxLayout:
+                orientation: "vertical"
                 size_hint_y: None
-                height: "38dp"
+                height: "250dp"
+                padding: "18dp"
+                spacing: "10dp"
+                canvas.before:
+                    Color:
+                        rgba: 0.14, 0.35, 0.27, 1
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [24, 24, 24, 24]
+
+                Label:
+                    text: "Statements"
+                    size_hint_y: None
+                    height: "34dp"
+                    halign: "left"
+                    valign: "middle"
+                    text_size: self.width, self.height
+                    font_size: "30sp"
+                    bold: True
+                    color: 1, 1, 1, 1
+
+                Label:
+                    text: "Upload a bank statement PDF and review each parsed row before saving."
+                    size_hint_y: None
+                    height: "44dp"
+                    halign: "left"
+                    valign: "top"
+                    text_size: self.width, None
+                    color: 0.84, 0.93, 0.89, 1
+
+                Label:
+                    text: root.status_message
+                    size_hint_y: None
+                    height: "54dp"
+                    halign: "left"
+                    valign: "top"
+                    text_size: self.width, None
+                    color: root.status_color
 
                 Label:
                     text: root.selected_file_label
+                    size_hint_y: None
+                    height: "28dp"
                     halign: "left"
                     valign: "middle"
                     text_size: self.width, self.height
@@ -469,85 +472,92 @@ KV = """
                     shorten: True
                     shorten_from: "center"
 
-            BoxLayout:
-                size_hint_y: None
-                height: "44dp"
-                spacing: "10dp"
+                BoxLayout:
+                    size_hint_y: None
+                    height: "44dp"
+                    spacing: "10dp"
 
-                Button:
-                    text: "Browse PDF"
-                    background_normal: ""
-                    background_down: ""
-                    background_color: 0.93, 0.95, 0.94, 1
-                    color: 0.14, 0.18, 0.16, 1
-                    on_release: root.open_file_browser()
+                    Button:
+                        text: "Browse PDF"
+                        background_normal: ""
+                        background_down: ""
+                        background_color: 0.93, 0.95, 0.94, 1
+                        color: 0.14, 0.18, 0.16, 1
+                        on_release: root.open_file_browser()
 
-                Button:
-                    text: "Upload"
-                    background_normal: ""
-                    background_down: ""
-                    background_color: 0.84, 0.92, 0.88, 1
-                    color: 0.13, 0.24, 0.19, 1
-                    bold: True
-                    on_release: root.import_statement()
-
-            BoxLayout:
-                size_hint_y: None
-                height: "44dp"
-                spacing: "10dp"
-
-                Widget:
-
-                Button:
-                    text: "Save All Debits"
-                    background_normal: ""
-                    background_down: ""
-                    background_color: 0.21, 0.56, 0.39, 1
-                    color: 1, 1, 1, 1
-                    bold: True
-                    on_release: root.save_all_debits()
-
-        BoxLayout:
-            orientation: "vertical"
-            padding: "18dp"
-            spacing: "12dp"
-
-            BoxLayout:
-                size_hint_y: None
-                height: "44dp"
-                spacing: "10dp"
-
-                Label:
-                    text: "Pending Review"
-                    halign: "left"
-                    valign: "middle"
-                    text_size: self.size
-                    font_size: "21sp"
-                    bold: True
-                    color: 0.15, 0.18, 0.16, 1
-
-                Spinner:
-                    id: direction_filter_input
-                    size_hint_x: None
-                    width: "170dp"
-                    text: "All Directions"
-                    values: ["All Directions", "Debit Only", "Credit Only"]
-                    background_normal: ""
-                    background_color: 1, 1, 1, 1
-                    color: 0.15, 0.18, 0.16, 1
-                    on_text: root.refresh_reviews()
-
-            ScrollView:
-                do_scroll_x: False
-                bar_width: "4dp"
+                    Button:
+                        text: "Upload"
+                        background_normal: ""
+                        background_down: ""
+                        background_color: 0.84, 0.92, 0.88, 1
+                        color: 0.13, 0.24, 0.19, 1
+                        bold: True
+                        on_release: root.import_statement()
 
                 BoxLayout:
-                    id: review_container
-                    orientation: "vertical"
                     size_hint_y: None
-                    height: self.minimum_height
-                    spacing: "12dp"
-                    padding: 0, 0, 0, "20dp"
+                    height: "44dp"
+                    spacing: "10dp"
+
+                    Widget:
+
+                    Button:
+                        text: "Save All Debits"
+                        background_normal: ""
+                        background_down: ""
+                        background_color: 0.21, 0.56, 0.39, 1
+                        color: 1, 1, 1, 1
+                        bold: True
+                        on_release: root.save_all_debits()
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: "14dp"
+                spacing: "12dp"
+                canvas.before:
+                    Color:
+                        rgba: 0.98, 0.97, 0.95, 1
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [24, 24, 24, 24]
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: "44dp"
+                    spacing: "10dp"
+
+                    Label:
+                        text: "Pending Review"
+                        halign: "left"
+                        valign: "middle"
+                        text_size: self.size
+                        font_size: "21sp"
+                        bold: True
+                        color: 0.15, 0.18, 0.16, 1
+
+                    Spinner:
+                        id: direction_filter_input
+                        size_hint_x: None
+                        width: "170dp"
+                        text: "All Directions"
+                        values: ["All Directions", "Debit Only", "Credit Only"]
+                        background_normal: ""
+                        background_color: 1, 1, 1, 1
+                        color: 0.15, 0.18, 0.16, 1
+                        on_text: root.refresh_reviews()
+
+                ScrollView:
+                    do_scroll_x: False
+                    bar_width: "4dp"
+
+                    BoxLayout:
+                        id: review_container
+                        orientation: "vertical"
+                        size_hint_y: None
+                        height: self.minimum_height
+                        spacing: "12dp"
+                        padding: 0, 0, 0, "20dp"
 
         BottomTabBar:
             active_tab: "notifications"
@@ -1545,7 +1555,7 @@ class ExpenseListScreen(Screen):
 
 class NotificationsScreen(Screen):
     repository = ObjectProperty(allownone=False)
-    status_message = StringProperty("Select a statement PDF, import it, and review the rows before saving.")
+    status_message = StringProperty("Choose a statement PDF to begin.")
     status_color = ListProperty([0.84, 0.93, 0.89, 1])
     selected_statement_path = StringProperty("")
     selected_file_label = StringProperty("No PDF selected yet.")
@@ -1666,6 +1676,8 @@ class NotificationsScreen(Screen):
             f"Imported {imported} row(s) from {result.bank_name} statement.{warning_suffix}",
             is_error=False,
         )
+        self.selected_statement_path = ""
+        self.selected_file_label = "No PDF selected yet."
         self.refresh_reviews()
 
     def save_all_debits(self) -> None:
@@ -1708,8 +1720,15 @@ class NotificationsScreen(Screen):
             container.add_widget(self._build_review_card(review))
 
     def _build_review_card(self, review: StatementReviewRecord) -> BoxLayout:
-        card = BoxLayout(size_hint_y=None, height=dp(214), padding=(0, 0, 0, dp(6)))
-        surface = BoxLayout(orientation="vertical", spacing=dp(8), padding=dp(14))
+        card = BoxLayout(size_hint_y=None, orientation="vertical", padding=(0, 0, 0, dp(6)))
+        surface = BoxLayout(
+            orientation="vertical",
+            spacing=dp(8),
+            padding=dp(14),
+            size_hint_y=None,
+        )
+        surface.bind(minimum_height=lambda instance, value: setattr(instance, "height", value))
+        card.bind(minimum_height=lambda instance, value: setattr(instance, "height", value))
 
         def redraw_card(instance: BoxLayout, _value) -> None:
             from kivy.graphics import Color, RoundedRectangle
@@ -1722,37 +1741,38 @@ class NotificationsScreen(Screen):
         surface.bind(pos=redraw_card, size=redraw_card)
         redraw_card(surface, None)
 
-        header = BoxLayout(size_hint_y=None, height=dp(28), spacing=dp(8))
+        header = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(8))
         source = Label(
             text=f"{review.bank_name} x{review.account_last4}",
             halign="left",
             valign="middle",
             color=(0.11, 0.31, 0.21, 1),
             bold=True,
-            font_size="16sp",
+            font_size="15sp",
         )
         direction = Label(
             text=review.direction.title(),
             size_hint_x=None,
-            width=dp(86),
+            width=dp(92),
             halign="center",
             valign="middle",
             color=(0.68, 0.24, 0.2, 1) if review.direction != "debit" else (0.11, 0.31, 0.21, 1),
             bold=True,
-            font_size="15sp",
+            font_size="14sp",
         )
         amount = Label(
             text=f"Rs. {review.amount:.2f}",
             size_hint_x=None,
-            width=dp(118),
+            width=dp(124),
             halign="right",
             valign="middle",
             color=(0.11, 0.31, 0.21, 1),
             bold=True,
-            font_size="16sp",
+            font_size="15sp",
         )
-        for widget in (source, direction, amount):
-            widget.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        source.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, instance.height)))
+        direction.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        amount.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         header.add_widget(source)
         header.add_widget(direction)
         header.add_widget(amount)
@@ -1761,10 +1781,10 @@ class NotificationsScreen(Screen):
         merchant = Label(
             text=review.merchant,
             size_hint_y=None,
-            height=dp(32),
+            height=dp(38),
             halign="left",
             valign="middle",
-            font_size="21sp",
+            font_size="19sp",
             bold=True,
             color=(0.15, 0.18, 0.16, 1),
         )
@@ -1779,6 +1799,8 @@ class NotificationsScreen(Screen):
             valign="middle",
             color=(0.47, 0.52, 0.49, 1),
             font_size="14sp",
+            shorten=True,
+            shorten_from="right",
         )
         meta.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
         surface.add_widget(meta)
@@ -1786,7 +1808,7 @@ class NotificationsScreen(Screen):
         raw_row = Label(
             text=review.raw_row,
             size_hint_y=None,
-            height=dp(52),
+            height=dp(42),
             halign="left",
             valign="top",
             color=(0.47, 0.52, 0.49, 1),
