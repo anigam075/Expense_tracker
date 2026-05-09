@@ -32,7 +32,7 @@ android.permissions =
 p4a.hook = p4a/hook.py
 
 # Entry point
-presplash.filename =
+presplash.filename = assets/presplash.png
 icon.filename = assets/logo.png
 
 # Packaging
