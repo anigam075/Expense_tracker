@@ -528,6 +528,17 @@ class ExpenseRepository:
         if cursor.rowcount == 0:
             raise ValueError(f"Statement review with id {review_id} was not found.")
 
+    def clear_statement_reviews(self, status: str = "pending") -> int:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM statement_reviews
+                WHERE status = ?
+                """,
+                (status,),
+            )
+        return int(cursor.rowcount)
+
     def _row_to_record(self, row: sqlite3.Row) -> ExpenseRecord:
         return ExpenseRecord(
             id=row["id"],

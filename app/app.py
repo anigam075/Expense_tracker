@@ -541,7 +541,16 @@ KV = """
                     height: "44dp"
                     spacing: "10dp"
 
-                    Widget:
+                    Button:
+                        text: "Clear"
+                        size_hint_x: None
+                        width: "110dp"
+                        background_normal: ""
+                        background_down: ""
+                        background_color: 0.46, 0.51, 0.49, 1
+                        color: 1, 1, 1, 1
+                        bold: True
+                        on_release: root.clear_pending_reviews()
 
                     Button:
                         text: "Save All Debits"
@@ -2250,6 +2259,15 @@ class NotificationsScreen(Screen):
         home_screen = self.manager.get_screen("list")
         home_screen.show_saved_status(f"Saved {saved} statement transaction(s) to the main list.")
         home_screen.refresh_expenses()
+
+    def clear_pending_reviews(self) -> None:
+        cleared = self.repository.clear_statement_reviews(status="pending")
+        if not cleared:
+            self._set_status("No pending statement rows are available to clear.", is_error=True)
+            return
+
+        self._set_status(f"Cleared {cleared} pending statement row(s).", is_error=False)
+        self.refresh_reviews()
 
     def refresh_reviews(self) -> None:
         container = self.ids.review_container
