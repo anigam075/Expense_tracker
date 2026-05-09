@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 from pypdf import PdfReader
 
@@ -47,24 +47,35 @@ class ParseResult:
     warnings: list[str]
 
 
-def parse_statement_pdf(pdf_path: str | Path) -> ParseResult:
+ProgressCallback = Callable[[str, int], None]
+
+
+def parse_statement_pdf(pdf_path: str | Path, progress_callback: ProgressCallback | None = None) -> ParseResult:
     path = Path(pdf_path)
-    text = extract_pdf_text(path)
+    _report_progress(progress_callback, "Opening statement PDF...", 5)
+    text = extract_pdf_text(path, progress_callback=progress_callback)
+    _report_progress(progress_callback, "Detecting bank format...", 35)
     bank = detect_bank(text)
     if bank == "kotak":
-        return parse_kotak(text)
+        return parse_kotak(text, progress_callback=progress_callback)
     if bank == "idfc":
-        return parse_idfc(text)
+        return parse_idfc(text, progress_callback=progress_callback)
     if bank == "icici":
-        return parse_icici(text)
+        return parse_icici(text, progress_callback=progress_callback)
     if bank == "sbi":
-        return parse_sbi(text)
+        return parse_sbi(text, progress_callback=progress_callback)
     raise ValueError("Unsupported bank statement. Supported: Kotak, IDFC First, ICICI, SBI.")
 
 
-def extract_pdf_text(path: Path) -> str:
+def extract_pdf_text(path: Path, progress_callback: ProgressCallback | None = None) -> str:
     reader = PdfReader(str(path))
-    return "\n".join((page.extract_text() or "") for page in reader.pages)
+    texts: list[str] = []
+    total_pages = max(len(reader.pages), 1)
+    for index, page in enumerate(reader.pages, start=1):
+        texts.append(page.extract_text() or "")
+        percent = 5 + int((index / total_pages) * 25)
+        _report_progress(progress_callback, f"Reading PDF page {index} of {total_pages}...", percent)
+    return "\n".join(texts)
 
 
 def detect_bank(text: str) -> str:
@@ -80,7 +91,7 @@ def detect_bank(text: str) -> str:
     return "unknown"
 
 
-def parse_kotak(text: str) -> ParseResult:
+def parse_kotak(text: str, progress_callback: ProgressCallback | None = None) -> ParseResult:
     account_last4 = _last4(_search_value(text, r"Account No\.\s*([0-9Xx*]+)"))
     lines = _clean_lines(text)
     rows = _group_rows(lines, KOTAK_ROW_RE, _is_kotak_noise)
@@ -89,7 +100,8 @@ def parse_kotak(text: str) -> ParseResult:
     transactions: list[ParsedStatementTransaction] = []
     warnings: list[str] = []
 
-    for raw in rows:
+    total_rows = max(len(rows), 1)
+    for index, raw in enumerate(rows, start=1):
         match = KOTAK_ROW_RE.match(raw)
         if not match:
             continue
@@ -119,11 +131,15 @@ def parse_kotak(text: str) -> ParseResult:
                 raw_row=raw,
             )
         )
+        if index == 1 or index == total_rows or index % 10 == 0:
+            percent = 35 + int((index / total_rows) * 65)
+            _report_progress(progress_callback, f"Parsing Kotak transactions ({index}/{total_rows})...", percent)
 
+    _report_progress(progress_callback, "Finalizing parsed transactions...", 100)
     return ParseResult("Kotak Mahindra Bank", account_last4, transactions, warnings)
 
 
-def parse_idfc(text: str) -> ParseResult:
+def parse_idfc(text: str, progress_callback: ProgressCallback | None = None) -> ParseResult:
     account_last4 = _last4(_search_value(text, r"ACCOUNT NO\s*:\s*([0-9Xx*]+)"))
     lines = _clean_lines(text)
     rows = _group_rows(lines, IDFC_ROW_RE, _is_idfc_noise)
@@ -132,7 +148,8 @@ def parse_idfc(text: str) -> ParseResult:
     transactions: list[ParsedStatementTransaction] = []
     warnings: list[str] = []
 
-    for raw in rows:
+    total_rows = max(len(rows), 1)
+    for index, raw in enumerate(rows, start=1):
         match = IDFC_ROW_RE.match(raw)
         if not match:
             continue
@@ -162,11 +179,15 @@ def parse_idfc(text: str) -> ParseResult:
                 raw_row=raw,
             )
         )
+        if index == 1 or index == total_rows or index % 10 == 0:
+            percent = 35 + int((index / total_rows) * 65)
+            _report_progress(progress_callback, f"Parsing IDFC transactions ({index}/{total_rows})...", percent)
 
+    _report_progress(progress_callback, "Finalizing parsed transactions...", 100)
     return ParseResult("IDFC First Bank", account_last4, transactions, warnings)
 
 
-def parse_icici(text: str) -> ParseResult:
+def parse_icici(text: str, progress_callback: ProgressCallback | None = None) -> ParseResult:
     account_last4 = _last4(
         _search_value(text, r"Savings A/c\s+([Xx*0-9]+)")
         or _search_value(text, r"Savings Account\s+([Xx*0-9]+)")
@@ -178,7 +199,8 @@ def parse_icici(text: str) -> ParseResult:
     transactions: list[ParsedStatementTransaction] = []
     warnings: list[str] = []
 
-    for raw in rows:
+    total_rows = max(len(rows), 1)
+    for index, raw in enumerate(rows, start=1):
         match = ICICI_ROW_RE.match(raw)
         if not match:
             continue
@@ -214,11 +236,15 @@ def parse_icici(text: str) -> ParseResult:
                 raw_row=raw,
             )
         )
+        if index == 1 or index == total_rows or index % 10 == 0:
+            percent = 35 + int((index / total_rows) * 65)
+            _report_progress(progress_callback, f"Parsing ICICI transactions ({index}/{total_rows})...", percent)
 
+    _report_progress(progress_callback, "Finalizing parsed transactions...", 100)
     return ParseResult("ICICI Bank", account_last4, transactions, warnings)
 
 
-def parse_sbi(text: str) -> ParseResult:
+def parse_sbi(text: str, progress_callback: ProgressCallback | None = None) -> ParseResult:
     account_last4 = _last4(_search_value(text, r"SAVING ACCOUNT\s+X+([0-9]+)"))
     transaction_text = _after_sbi_transaction_header(text)
     lines = _clean_lines(transaction_text)
@@ -226,7 +252,8 @@ def parse_sbi(text: str) -> ParseResult:
     transactions: list[ParsedStatementTransaction] = []
     warnings: list[str] = []
 
-    for raw in rows:
+    total_rows = max(len(rows), 1)
+    for index, raw in enumerate(rows, start=1):
         match = SBI_ROW_RE.match(raw)
         if not match:
             continue
@@ -264,7 +291,11 @@ def parse_sbi(text: str) -> ParseResult:
                 raw_row=raw,
             )
         )
+        if index == 1 or index == total_rows or index % 10 == 0:
+            percent = 35 + int((index / total_rows) * 65)
+            _report_progress(progress_callback, f"Parsing SBI transactions ({index}/{total_rows})...", percent)
 
+    _report_progress(progress_callback, "Finalizing parsed transactions...", 100)
     return ParseResult("State Bank of India", account_last4, transactions, warnings)
 
 
@@ -518,3 +549,9 @@ def _infer_payment_method(description: str) -> str:
     if upper.startswith("BIL/"):
         return "Card"
     return "Bank Transfer"
+
+
+def _report_progress(progress_callback: ProgressCallback | None, message: str, percent: int) -> None:
+    if progress_callback is None:
+        return
+    progress_callback(message, max(0, min(percent, 100)))

@@ -8,6 +8,7 @@ import traceback
 from datetime import datetime
 from datetime import date
 from pathlib import Path
+from threading import Thread
 from urllib.parse import unquote
 
 from kivy.app import App
@@ -1096,6 +1097,27 @@ class ReviewPopupContent(BoxLayout):
         return super().on_touch_down(touch)
 
 
+class CircularProgressRing(Widget):
+    progress = NumericProperty(0)
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.bind(pos=self._redraw, size=self._redraw, progress=self._redraw)
+
+    def _redraw(self, *_args) -> None:
+        from kivy.graphics import Color, Line
+
+        self.canvas.before.clear()
+        with self.canvas.before:
+            center_x = self.center_x
+            center_y = self.center_y
+            radius = min(self.width, self.height) / 2 - dp(6)
+            Color(0.82, 0.86, 0.84, 1)
+            Line(circle=(center_x, center_y, radius, 0, 360), width=dp(6))
+            Color(0.21, 0.56, 0.39, 1)
+            Line(circle=(center_x, center_y, radius, 90, 90 + (360 * (self.progress / 100.0))), width=dp(6))
+
+
 class DatePickerPopup(Popup):
     selected_date = ObjectProperty(allownone=False)
     on_select = ObjectProperty(allownone=False)
@@ -2018,12 +2040,26 @@ class NotificationsScreen(Screen):
         self.selected_file_label = display_name
 
     def import_statement(self) -> None:
-        try:
-            raw_path = self.selected_statement_path.strip()
-            if not raw_path:
-                self._set_status("Choose a statement PDF first.", is_error=True)
-                return
+        raw_path = self.selected_statement_path.strip()
+        if not raw_path:
+            self._set_status("Choose a statement PDF first.", is_error=True)
+            return
 
+        if getattr(self, "_statement_import_in_progress", False):
+            self._set_status("Statement import is already in progress.", is_error=True)
+            return
+
+        self._statement_import_in_progress = True
+        self._show_statement_loader()
+        source_name = self.selected_source_name or self._friendly_pdf_name(raw_path, fallback="statement.pdf")
+        Thread(
+            target=self._run_statement_import,
+            args=(raw_path, source_name),
+            daemon=True,
+        ).start()
+
+    def _run_statement_import(self, raw_path: str, source_name: str) -> None:
+        try:
             materialized_path = materialize_selected_pdf(raw_path)
             if materialized_path is None:
                 path = Path(raw_path).expanduser()
@@ -2031,10 +2067,9 @@ class NotificationsScreen(Screen):
                 path = materialized_path
 
             if not path.exists() or path.suffix.lower() != ".pdf":
-                self._set_status("Please choose a valid PDF file.", is_error=True)
-                return
+                raise ValueError("Please choose a valid PDF file.")
 
-            result = parse_statement_pdf(path)
+            result = parse_statement_pdf(path, progress_callback=self._statement_progress_callback)
         except Exception as exc:
             app = App.get_running_app()
             log_path = ""
@@ -2043,11 +2078,20 @@ class NotificationsScreen(Screen):
             message = f"Unable to import statement: {type(exc).__name__}: {exc}"
             if log_path:
                 message = f"{message} | Log: {log_path}"
-            self._set_status(message, is_error=True)
+            Clock.schedule_once(lambda _dt: self._finish_statement_import_error(message), 0)
             return
 
+        Clock.schedule_once(
+            lambda _dt: self._finish_statement_import_success(result, source_name),
+            0,
+        )
+
+    def _statement_progress_callback(self, message: str, percent: int) -> None:
+        Clock.schedule_once(lambda _dt: self._update_statement_loader(message, percent), 0)
+
+    @mainthread
+    def _finish_statement_import_success(self, result, source_name: str) -> None:
         imported = 0
-        source_name = self.selected_source_name or self._friendly_pdf_name(raw_path, fallback=path.name)
         for txn in result.transactions:
             self.repository.add_statement_review(
                 StatementReviewRecord(
@@ -2075,6 +2119,119 @@ class NotificationsScreen(Screen):
         self.selected_source_name = ""
         self.selected_file_label = "No PDF selected yet."
         self.refresh_reviews()
+        self._hide_statement_loader()
+        self._statement_import_in_progress = False
+
+    @mainthread
+    def _finish_statement_import_error(self, message: str) -> None:
+        self._hide_statement_loader()
+        self._statement_import_in_progress = False
+        self._set_status(message, is_error=True)
+
+    def _show_statement_loader(self) -> None:
+        if getattr(self, "_statement_loader_modal", None) is not None:
+            return
+
+        modal = ModalView(
+            auto_dismiss=False,
+            size_hint=(1, 1),
+            background_color=(0.05, 0.07, 0.06, 0.58),
+        )
+        outer = AnchorLayout(anchor_x="center", anchor_y="center")
+        card = BoxLayout(
+            orientation="vertical",
+            size_hint=(None, None),
+            size=(dp(250), dp(240)),
+            spacing=dp(12),
+            padding=dp(18),
+        )
+
+        def redraw_card(instance: BoxLayout, _value) -> None:
+            from kivy.graphics import Color, RoundedRectangle
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(0.99, 0.98, 0.96, 1)
+                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[20, 20, 20, 20])
+
+        card.bind(pos=redraw_card, size=redraw_card)
+        redraw_card(card, None)
+
+        title = Label(
+            text="Parsing Statement",
+            size_hint_y=None,
+            height=dp(28),
+            halign="center",
+            valign="middle",
+            font_size="20sp",
+            bold=True,
+            color=(0.14, 0.18, 0.16, 1),
+        )
+        title.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+
+        ring = CircularProgressRing(size_hint=(None, None), size=(dp(110), dp(110)))
+        ring.progress = 0
+        percent_label = Label(
+            text="0%",
+            size_hint_y=None,
+            height=dp(24),
+            halign="center",
+            valign="middle",
+            font_size="18sp",
+            bold=True,
+            color=(0.13, 0.24, 0.19, 1),
+        )
+        percent_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+
+        progress_box = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(146), spacing=dp(12))
+        ring_anchor = AnchorLayout(anchor_x="center", anchor_y="center")
+        ring_anchor.add_widget(ring)
+        progress_box.add_widget(ring_anchor)
+        progress_box.add_widget(percent_label)
+
+        status_label = Label(
+            text="Preparing statement parser...",
+            size_hint_y=None,
+            height=dp(32),
+            halign="center",
+            valign="middle",
+            color=(0.42, 0.47, 0.45, 1),
+        )
+        status_label.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width, None)))
+
+        card.add_widget(title)
+        card.add_widget(progress_box)
+        card.add_widget(status_label)
+        outer.add_widget(card)
+        modal.add_widget(outer)
+
+        self._statement_loader_modal = modal
+        self._statement_loader_ring = ring
+        self._statement_loader_percent_label = percent_label
+        self._statement_loader_status_label = status_label
+        modal.open()
+
+    @mainthread
+    def _update_statement_loader(self, message: str, percent: int) -> None:
+        ring = getattr(self, "_statement_loader_ring", None)
+        percent_label = getattr(self, "_statement_loader_percent_label", None)
+        status_label = getattr(self, "_statement_loader_status_label", None)
+        if ring is None or percent_label is None or status_label is None:
+            return
+
+        ring.progress = percent
+        percent_label.text = f"{percent}%"
+        status_label.text = message
+
+    @mainthread
+    def _hide_statement_loader(self) -> None:
+        modal = getattr(self, "_statement_loader_modal", None)
+        if modal is not None:
+            modal.dismiss()
+        self._statement_loader_modal = None
+        self._statement_loader_ring = None
+        self._statement_loader_percent_label = None
+        self._statement_loader_status_label = None
 
     def save_all_debits(self) -> None:
         saved = 0
