@@ -1,8 +1,8 @@
 [app]
 
 # App metadata
-title = Expense Tracker
-package.name = expensetracker
+title = SpendSutra
+package.name = spendsutra
 package.domain = org.example
 
 # Source configuration
@@ -33,7 +33,7 @@ p4a.hook = p4a/hook.py
 
 # Entry point
 presplash.filename =
-icon.filename =
+icon.filename = assets/logo.png
 
 # Packaging
 log_level = 2

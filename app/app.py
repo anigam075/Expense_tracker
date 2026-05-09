@@ -226,7 +226,7 @@ KV = """
                     radius: [24, 24, 24, 24]
 
             Label:
-                text: "Expense Atlas"
+                text: "SpendSutra"
                 size_hint_y: None
                 height: "34dp"
                 halign: "left"
@@ -3025,7 +3025,7 @@ class ExpenseRoot(ScreenManager):
 
 
 class ExpenseTrackerApp(App):
-    title = "Expense Tracker"
+    title = "SpendSutra"
 
     def build(self) -> ExpenseRoot | Label:
         try:
