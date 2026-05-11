@@ -76,7 +76,7 @@ KV = """
         on_release: app.root.current = "list"
 
     Button:
-        text: "Statements"
+        text: "Import Statements"
         background_normal: ""
         background_down: ""
         background_color: (0.21, 0.56, 0.39, 1) if root.active_tab == "notifications" else (0.93, 0.95, 0.94, 1)
@@ -389,6 +389,29 @@ KV = """
                 cursor_color: 0.18, 0.5, 0.32, 1
                 padding: "14dp", "14dp"
                 on_text: root.refresh_expenses()
+
+            BoxLayout:
+                size_hint_y: None
+                height: "48dp"
+                spacing: "10dp"
+
+                Button:
+                    id: start_date_filter_button
+                    text: root.start_date_filter_text
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 1, 1, 1, 1
+                    color: 0.15, 0.18, 0.16, 1
+                    on_release: root.open_start_date_picker()
+
+                Button:
+                    id: end_date_filter_button
+                    text: root.end_date_filter_text
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 1, 1, 1, 1
+                    color: 0.15, 0.18, 0.16, 1
+                    on_release: root.open_end_date_picker()
 
             BoxLayout:
                 size_hint_y: None
@@ -1312,6 +1335,10 @@ class ExpenseListScreen(Screen):
     total_amount_text = StringProperty("Rs. 0.00")
     expense_count_text = StringProperty("0")
     status_is_error = NumericProperty(0)
+    start_date_filter = StringProperty("")
+    end_date_filter = StringProperty("")
+    start_date_filter_text = StringProperty("Start Date")
+    end_date_filter_text = StringProperty("End Date")
 
     def on_pre_enter(self, *args) -> None:
         self.refresh_expenses()
@@ -1367,10 +1394,54 @@ class ExpenseListScreen(Screen):
             )
 
     def clear_filters(self) -> None:
+        self.start_date_filter = ""
+        self.end_date_filter = ""
+        self.start_date_filter_text = "Start Date"
+        self.end_date_filter_text = "End Date"
         self.ids.search_input.text = ""
         self.ids.payment_filter_input.text = "All Methods"
         self.ids.sort_input.text = "Newest"
         self.refresh_expenses()
+
+    def open_start_date_picker(self) -> None:
+        selected_date = self._selected_filter_date(self.start_date_filter)
+        popup = DatePickerPopup(
+            selected_date=selected_date,
+            on_select=self._set_start_date_filter,
+        )
+        popup.open()
+
+    def open_end_date_picker(self) -> None:
+        selected_date = self._selected_filter_date(self.end_date_filter)
+        popup = DatePickerPopup(
+            selected_date=selected_date,
+            on_select=self._set_end_date_filter,
+        )
+        popup.open()
+
+    def _set_start_date_filter(self, selected: date) -> None:
+        self.start_date_filter = selected.isoformat()
+        self.start_date_filter_text = self.start_date_filter
+        if self.end_date_filter and self.start_date_filter > self.end_date_filter:
+            self.end_date_filter = ""
+            self.end_date_filter_text = "End Date"
+            self._set_status("Start date updated. Choose an end date to complete the range.", is_error=False)
+        self.refresh_expenses()
+
+    def _set_end_date_filter(self, selected: date) -> None:
+        self.end_date_filter = selected.isoformat()
+        self.end_date_filter_text = self.end_date_filter
+        if self.start_date_filter and self.end_date_filter < self.start_date_filter:
+            self.start_date_filter = ""
+            self.start_date_filter_text = "Start Date"
+            self._set_status("End date updated. Choose a start date to complete the range.", is_error=False)
+        self.refresh_expenses()
+
+    def _selected_filter_date(self, raw_value: str) -> date:
+        try:
+            return date.fromisoformat(raw_value) if raw_value else date.today()
+        except ValueError:
+            return date.today()
 
     def add_expense(self) -> None:
         edit_screen = self.manager.get_screen("edit")
@@ -1477,6 +1548,20 @@ class ExpenseListScreen(Screen):
 
         if payment_method != "All Methods":
             expenses = [expense for expense in expenses if expense.payment_method == payment_method]
+
+        if self.start_date_filter:
+            expenses = [
+                expense
+                for expense in expenses
+                if expense.expense_date >= self.start_date_filter
+            ]
+
+        if self.end_date_filter:
+            expenses = [
+                expense
+                for expense in expenses
+                if expense.expense_date <= self.end_date_filter
+            ]
 
         if sort_option == "Oldest":
             expenses.sort(key=lambda expense: (expense.expense_date, expense.id or 0))
@@ -1737,7 +1822,6 @@ class ExpenseListScreen(Screen):
                 f"{display_name}\n\n"
                 f"Rows found: {result.total_rows}\n"
                 f"Ready to import: {len(result.importable_rows)}\n"
-                f"Possible duplicates skipped: {len(result.duplicate_rows)}\n"
                 f"Invalid rows skipped: {len(result.invalid_rows)}"
             ),
             size_hint_y=None,
@@ -1811,7 +1895,7 @@ class ExpenseListScreen(Screen):
         self.refresh_expenses()
         self.show_saved_status(f"Imported {imported} transaction(s) from CSV.")
         self._set_transfer_status(
-            f"Imported {imported} row(s). Skipped {len(result.duplicate_rows)} duplicates and {len(result.invalid_rows)} invalid rows.",
+            f"Imported {imported} row(s). Skipped {len(result.invalid_rows)} invalid rows.",
             is_error=False,
         )
 

@@ -62,8 +62,6 @@ def parse_transactions_csv(csv_path: str | Path, existing_expenses: list[Expense
         if missing_headers:
             return CsvImportResult(total_rows=0, missing_headers=missing_headers)
 
-        existing_keys = {_expense_key(expense) for expense in existing_expenses}
-        seen_import_keys: set[tuple[float, str, str, str]] = set()
         result = CsvImportResult(total_rows=0)
 
         for row_number, raw_row in enumerate(reader, start=2):
@@ -74,12 +72,6 @@ def parse_transactions_csv(csv_path: str | Path, existing_expenses: list[Expense
                 result.invalid_rows.append(parsed)
                 continue
 
-            key = _expense_key(parsed)
-            if key in existing_keys or key in seen_import_keys:
-                result.duplicate_rows.append(parsed)
-                continue
-
-            seen_import_keys.add(key)
             result.importable_rows.append(parsed)
 
         return result
@@ -125,16 +117,5 @@ def _parse_row(row: dict[str, str], row_number: int) -> ExpenseRecord | CsvImpor
         notes=notes,
         source=source,
     )
-
-
-def _expense_key(expense: ExpenseRecord) -> tuple[float, str, str, str]:
-    return (
-        round(float(expense.amount), 2),
-        expense.expense_date,
-        expense.merchant.strip().lower(),
-        expense.payment_method.strip().lower(),
-    )
-
-
 def _normalize_text(value: object) -> str:
     return " ".join(str(value or "").strip().split())
