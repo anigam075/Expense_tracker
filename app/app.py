@@ -73,7 +73,16 @@ KV = """
         background_color: (0.21, 0.56, 0.39, 1) if root.active_tab == "home" else (0.93, 0.95, 0.94, 1)
         color: (1, 1, 1, 1) if root.active_tab == "home" else (0.14, 0.18, 0.16, 1)
         bold: True
-        on_release: app.root.current = "list"
+        on_release: app.root.current = "home"
+
+    Button:
+        text: "Transactions"
+        background_normal: ""
+        background_down: ""
+        background_color: (0.21, 0.56, 0.39, 1) if root.active_tab == "transactions" else (0.93, 0.95, 0.94, 1)
+        color: (1, 1, 1, 1) if root.active_tab == "transactions" else (0.14, 0.18, 0.16, 1)
+        bold: True
+        on_release: app.root.current = "transactions"
 
     Button:
         text: "Import Statements"
@@ -199,7 +208,7 @@ KV = """
                 on_release: root.open_actions(self)
 
 <ExpenseListScreen>:
-    name: "list"
+    name: "home"
     BoxLayout:
         orientation: "vertical"
         padding: "14dp"
@@ -214,7 +223,7 @@ KV = """
         BoxLayout:
             orientation: "vertical"
             size_hint_y: None
-            height: "322dp"
+            height: "260dp"
             padding: "18dp"
             spacing: "14dp"
             canvas.before:
@@ -307,8 +316,17 @@ KV = """
 
             BoxLayout:
                 size_hint_y: None
-                height: "46dp"
+                height: "48dp"
                 spacing: "10dp"
+
+                Button:
+                    text: "+ Add Expense"
+                    background_normal: ""
+                    background_down: ""
+                    background_color: 0.21, 0.56, 0.39, 1
+                    color: 1, 1, 1, 1
+                    bold: True
+                    on_release: root.add_expense()
 
                 Button:
                     text: "View Visualization"
@@ -319,16 +337,16 @@ KV = """
                     bold: True
                     on_release: root.open_visualization()
 
-                Button:
-                    text: "Data Transfer"
-                    size_hint_x: None
-                    width: "150dp"
-                    background_normal: ""
-                    background_down: ""
-                    background_color: 0.93, 0.95, 0.94, 1
-                    color: 0.14, 0.18, 0.16, 1
-                    bold: True
-                    on_release: root.open_data_transfer()
+            Button:
+                text: "Data Transfer"
+                size_hint_y: None
+                height: "46dp"
+                background_normal: ""
+                background_down: ""
+                background_color: 0.93, 0.95, 0.94, 1
+                color: 0.14, 0.18, 0.16, 1
+                bold: True
+                on_release: root.open_data_transfer()
 
             Label:
                 text: root.status_message
@@ -353,11 +371,10 @@ KV = """
 
             BoxLayout:
                 size_hint_y: None
-                height: "54dp"
-                spacing: "12dp"
+                height: "42dp"
 
                 Label:
-                    text: "Recent Expenses"
+                    text: "Spend by Payment Method"
                     halign: "left"
                     valign: "middle"
                     text_size: self.size
@@ -365,16 +382,95 @@ KV = """
                     bold: True
                     color: 0.15, 0.18, 0.16, 1
 
-                Button:
-                    text: "+ Add Expense"
-                    size_hint_x: None
-                    width: "152dp"
-                    background_normal: ""
-                    background_down: ""
-                    background_color: 0.21, 0.56, 0.39, 1
-                    color: 1, 1, 1, 1
-                    bold: True
-                    on_release: root.add_expense()
+            BoxLayout:
+                spacing: "14dp"
+
+                AnchorLayout:
+                    id: pie_chart_anchor
+                    size_hint_x: 0.56
+
+                ScrollView:
+                    do_scroll_x: False
+                    bar_width: "4dp"
+
+                    BoxLayout:
+                        id: pie_legend_container
+                        orientation: "vertical"
+                        size_hint_y: None
+                        height: self.minimum_height
+                        spacing: "10dp"
+                        padding: 0, 0, 0, "20dp"
+
+        BottomTabBar:
+            active_tab: "home"
+
+<TransactionsScreen>:
+    name: "transactions"
+    BoxLayout:
+        orientation: "vertical"
+        padding: "14dp"
+        spacing: "14dp"
+        canvas.before:
+            Color:
+                rgba: 0.97, 0.95, 0.91, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_y: None
+            height: "170dp"
+            padding: "18dp"
+            spacing: "12dp"
+            canvas.before:
+                Color:
+                    rgba: 0.14, 0.35, 0.27, 1
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [24, 24, 24, 24]
+
+            Label:
+                text: "Transactions"
+                size_hint_y: None
+                height: "34dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                font_size: "31sp"
+                bold: True
+                color: 1, 1, 1, 1
+
+            Label:
+                text: "Search, filter, sort, and manage every saved transaction."
+                size_hint_y: None
+                height: "22dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                color: 0.84, 0.93, 0.89, 1
+
+            Label:
+                text: root.status_message
+                size_hint_y: None
+                height: "24dp"
+                halign: "left"
+                valign: "middle"
+                text_size: self.width, self.height
+                color: root.status_color
+
+        BoxLayout:
+            orientation: "vertical"
+            padding: "14dp"
+            spacing: "14dp"
+            canvas.before:
+                Color:
+                    rgba: 0.98, 0.97, 0.95, 1
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [24, 24, 24, 24]
 
             TextInput:
                 id: search_input
@@ -421,7 +517,7 @@ KV = """
                 Spinner:
                     id: payment_filter_input
                     text: "All Methods"
-                    values: ["All Methods", "UPI", "Card", "Cash", "Net Banking", "Wallet", "Other"]
+                    values: ["All Methods", "UPI", "Card", "Cash", "Net Banking", "Wallet", "Other", "ACH", "NEFT", "IMPS", "Bank Transfer"]
                     background_normal: ""
                     background_color: 1, 1, 1, 1
                     color: 0.15, 0.18, 0.16, 1
@@ -459,7 +555,7 @@ KV = """
                     padding: 0, 0, 0, "20dp"
 
         BottomTabBar:
-            active_tab: "home"
+            active_tab: "transactions"
 
 <NotificationsScreen>:
     name: "notifications"
@@ -1150,6 +1246,37 @@ class CircularProgressRing(Widget):
             Line(circle=(center_x, center_y, radius, 90, 90 + (360 * (self.progress / 100.0))), width=dp(6))
 
 
+class PaymentMethodPieChart(Widget):
+    segments = ListProperty([])
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.bind(pos=self._redraw, size=self._redraw, segments=self._redraw)
+
+    def _redraw(self, *_args) -> None:
+        from kivy.graphics import Color, Ellipse
+
+        self.canvas.before.clear()
+        with self.canvas.before:
+            if not self.segments:
+                Color(0.9, 0.92, 0.91, 1)
+                Ellipse(pos=self.pos, size=self.size)
+                return
+
+            angle_start = 0.0
+            for _label, ratio, color in self.segments:
+                if ratio <= 0:
+                    continue
+                Color(*color)
+                Ellipse(
+                    pos=self.pos,
+                    size=self.size,
+                    angle_start=angle_start,
+                    angle_end=angle_start + (ratio * 360.0),
+                )
+                angle_start += ratio * 360.0
+
+
 class DatePickerPopup(Popup):
     selected_date = ObjectProperty(allownone=False)
     on_select = ObjectProperty(allownone=False)
@@ -1330,251 +1457,125 @@ class DatePickerPopup(Popup):
 
 class ExpenseListScreen(Screen):
     repository = ObjectProperty(allownone=False)
-    status_message = StringProperty("Review saved expenses or add a new one.")
-    status_color = ListProperty([0.13, 0.42, 0.23, 1])
+    status_message = StringProperty("Track totals, move quickly, and review the payment split.")
+    status_color = ListProperty([0.84, 0.93, 0.89, 1])
     total_amount_text = StringProperty("Rs. 0.00")
     expense_count_text = StringProperty("0")
-    status_is_error = NumericProperty(0)
-    start_date_filter = StringProperty("")
-    end_date_filter = StringProperty("")
-    start_date_filter_text = StringProperty("Start Date")
-    end_date_filter_text = StringProperty("End Date")
 
     def on_pre_enter(self, *args) -> None:
-        self.refresh_expenses()
+        self.refresh_dashboard()
         return super().on_pre_enter(*args)
 
-    def refresh_expenses(self) -> None:
-        container = self.ids.list_container
-        container.clear_widgets()
-        expenses = self._get_visible_expenses()
+    def refresh_dashboard(self) -> None:
+        expenses = self.repository.list_expenses(limit=None)
         total_amount = sum(expense.amount for expense in expenses)
         self.total_amount_text = f"Rs. {total_amount:,.2f}"
         self.expense_count_text = str(len(expenses))
+        self._refresh_pie_chart(expenses)
+
+    def _refresh_pie_chart(self, expenses: list[ExpenseRecord]) -> None:
+        chart_anchor = self.ids.pie_chart_anchor
+        legend_container = self.ids.pie_legend_container
+        chart_anchor.clear_widgets()
+        legend_container.clear_widgets()
 
         if not expenses:
             empty_label = Label(
-                text="No expenses yet. Add your first entry to start building your timeline.",
+                text="Add expenses to see the payment split.",
                 halign="center",
                 valign="middle",
-                color=(0.28, 0.32, 0.3, 1),
+                color=(0.32, 0.36, 0.34, 1),
             )
-            empty_label.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width - 24, None)))
-            container.add_widget(
-                BoxLayout(
-                    size_hint_y=None,
-                    height=180,
-                )
-            )
-            empty_state = container.children[0]
-            empty_state.padding = 18
-            empty_state.canvas.before.clear()
-            with empty_state.canvas.before:
-                from kivy.graphics import Color, RoundedRectangle
-                Color(1, 1, 1, 1)
-                RoundedRectangle(pos=empty_state.pos, size=empty_state.size, radius=[24, 24, 24, 24])
-            empty_state.bind(
-                pos=lambda instance, _value: self._refresh_empty_card(instance),
-                size=lambda instance, _value: self._refresh_empty_card(instance),
-            )
-            empty_state.add_widget(empty_label)
+            empty_label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+            chart_anchor.add_widget(empty_label)
             return
 
+        totals: defaultdict[str, float] = defaultdict(float)
         for expense in expenses:
-            container.add_widget(
-                ExpenseRow(
-                    expense_id=expense.id or 0,
-                    merchant_text=expense.merchant,
-                    note_text=expense.notes,
-                    amount_text=f"Rs. {expense.amount:.2f}",
-                    date_text=expense.expense_date,
-                    method_text=expense.payment_method,
-                    list_screen=self,
-                )
+            totals[expense.payment_method or "Other"] += expense.amount
+
+        palette = [
+            (0.14, 0.35, 0.27, 1),
+            (0.1, 0.77, 0.79, 1),
+            (0.64, 0.28, 0.67, 1),
+            (0.92, 0.61, 0.22, 1),
+            (0.39, 0.54, 0.93, 1),
+            (0.88, 0.36, 0.29, 1),
+        ]
+        total_spend = sum(totals.values()) or 1.0
+        segments = []
+        for index, (method, amount) in enumerate(sorted(totals.items(), key=lambda item: item[1], reverse=True)):
+            color = palette[index % len(palette)]
+            segments.append((method, amount / total_spend, color))
+            legend_container.add_widget(self._build_pie_legend_row(method, amount, color, total_spend))
+
+        chart_anchor.add_widget(
+            PaymentMethodPieChart(
+                size_hint=(None, None),
+                size=(dp(220), dp(220)),
+                segments=segments,
             )
-
-    def clear_filters(self) -> None:
-        self.start_date_filter = ""
-        self.end_date_filter = ""
-        self.start_date_filter_text = "Start Date"
-        self.end_date_filter_text = "End Date"
-        self.ids.search_input.text = ""
-        self.ids.payment_filter_input.text = "All Methods"
-        self.ids.sort_input.text = "Newest"
-        self.refresh_expenses()
-
-    def open_start_date_picker(self) -> None:
-        selected_date = self._selected_filter_date(self.start_date_filter)
-        popup = DatePickerPopup(
-            selected_date=selected_date,
-            on_select=self._set_start_date_filter,
         )
-        popup.open()
 
-    def open_end_date_picker(self) -> None:
-        selected_date = self._selected_filter_date(self.end_date_filter)
-        popup = DatePickerPopup(
-            selected_date=selected_date,
-            on_select=self._set_end_date_filter,
+    def _build_pie_legend_row(
+        self,
+        method: str,
+        amount: float,
+        color: tuple[float, float, float, float],
+        total_spend: float,
+    ) -> BoxLayout:
+        row = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(10))
+        swatch_anchor = AnchorLayout(size_hint_x=None, width=dp(20))
+        swatch = Widget(size_hint=(None, None), size=(dp(16), dp(16)))
+
+        def redraw_swatch(instance: Widget, _value) -> None:
+            from kivy.graphics import Color, RoundedRectangle
+
+            instance.canvas.before.clear()
+            with instance.canvas.before:
+                Color(*color)
+                RoundedRectangle(pos=instance.pos, size=instance.size, radius=[5, 5, 5, 5])
+
+        swatch.bind(pos=redraw_swatch, size=redraw_swatch)
+        redraw_swatch(swatch, None)
+        swatch_anchor.add_widget(swatch)
+        row.add_widget(swatch_anchor)
+
+        label = Label(
+            text=method,
+            halign="left",
+            valign="middle",
+            color=(0.15, 0.18, 0.16, 1),
+            font_size="14sp",
+            bold=True,
         )
-        popup.open()
+        label.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        row.add_widget(label)
 
-    def _set_start_date_filter(self, selected: date) -> None:
-        self.start_date_filter = selected.isoformat()
-        self.start_date_filter_text = self.start_date_filter
-        if self.end_date_filter and self.start_date_filter > self.end_date_filter:
-            self.end_date_filter = ""
-            self.end_date_filter_text = "End Date"
-            self._set_status("Start date updated. Choose an end date to complete the range.", is_error=False)
-        self.refresh_expenses()
-
-    def _set_end_date_filter(self, selected: date) -> None:
-        self.end_date_filter = selected.isoformat()
-        self.end_date_filter_text = self.end_date_filter
-        if self.start_date_filter and self.end_date_filter < self.start_date_filter:
-            self.start_date_filter = ""
-            self.start_date_filter_text = "Start Date"
-            self._set_status("End date updated. Choose a start date to complete the range.", is_error=False)
-        self.refresh_expenses()
-
-    def _selected_filter_date(self, raw_value: str) -> date:
-        try:
-            return date.fromisoformat(raw_value) if raw_value else date.today()
-        except ValueError:
-            return date.today()
+        value = Label(
+            text=f"Rs. {amount:,.0f}  ({(amount / total_spend) * 100:.0f}%)",
+            size_hint_x=None,
+            width=dp(132),
+            halign="right",
+            valign="middle",
+            color=(0.42, 0.47, 0.45, 1),
+            font_size="13sp",
+        )
+        value.bind(size=lambda instance, _value: setattr(instance, "text_size", instance.size))
+        row.add_widget(value)
+        return row
 
     def add_expense(self) -> None:
         edit_screen = self.manager.get_screen("edit")
         edit_screen.prepare_for_new()
         self.manager.current = "edit"
 
-    def edit_expense(self, expense_id: int | None) -> None:
-        if expense_id is None:
-            self._set_status("Unable to open this expense.", is_error=True)
-            return
-
-        edit_screen = self.manager.get_screen("edit")
-        edit_screen.load_expense(expense_id)
-        self.manager.current = "edit"
-
-    def view_expense(self, expense_id: int | None) -> None:
-        if expense_id is None:
-            self._set_status("Unable to open this expense.", is_error=True)
-            return
-
-        expense = self.repository.get_expense(expense_id)
-        if expense is None:
-            self._set_status("Expense not found.", is_error=True)
-            self.refresh_expenses()
-            return
-
-        self._open_expense_detail_popup(expense)
-
     def show_saved_status(self, message: str) -> None:
         self._set_status(message, is_error=False)
 
-    def confirm_delete(self, expense_id: int | None) -> None:
-        if expense_id is None:
-            self._set_status("Unable to delete this expense.", is_error=True)
-            return
-
-        expense = self.repository.get_expense(expense_id)
-        if expense is None:
-            self._set_status("Expense not found.", is_error=True)
-            self.refresh_expenses()
-            return
-
-        content = BoxLayout(orientation="vertical", spacing=12, padding=16)
-        content.add_widget(
-            Label(
-                text="Are you sure you want to delete this expense?",
-                halign="center",
-                valign="middle",
-                color=(0.15, 0.18, 0.16, 1),
-            )
-        )
-        buttons = BoxLayout(size_hint_y=None, height=58, spacing=10)
-        popup = Popup(
-            title="Delete Expense",
-            content=content,
-            size_hint=(0.85, None),
-            height=238,
-            auto_dismiss=False,
-        )
-        no_button = Button(
-            text="No",
-            background_normal="",
-            background_color=(0.4, 0.45, 0.43, 1),
-            size_hint_y=None,
-            height=58,
-        )
-        yes_button = Button(
-            text="Yes",
-            background_normal="",
-            background_color=(0.68, 0.24, 0.2, 1),
-            size_hint_y=None,
-            height=58,
-        )
-        no_button.bind(on_release=lambda _instance: popup.dismiss())
-        yes_button.bind(on_release=lambda _instance: self._delete_expense(expense, popup))
-        buttons.add_widget(no_button)
-        buttons.add_widget(yes_button)
-        content.add_widget(buttons)
-        popup.open()
-
-    def _delete_expense(self, expense: ExpenseRecord, popup: Popup) -> None:
-        self.repository.delete_expense(expense.id or 0)
-        popup.dismiss()
-        self.show_saved_status(f"Deleted Rs. {expense.amount:.2f} for {expense.merchant}.")
-        self.refresh_expenses()
-
     def _set_status(self, message: str, *, is_error: bool) -> None:
         self.status_message = message
-        self.status_color = [0.78, 0.24, 0.18, 1] if is_error else [0.13, 0.42, 0.23, 1]
-        self.status_is_error = 1 if is_error else 0
-
-    def _get_visible_expenses(self) -> list[ExpenseRecord]:
-        expenses = self.repository.list_expenses(limit=None)
-        search_text = self.ids.search_input.text.strip().lower() if "search_input" in self.ids else ""
-        payment_method = self.ids.payment_filter_input.text if "payment_filter_input" in self.ids else "All Methods"
-        sort_option = self.ids.sort_input.text if "sort_input" in self.ids else "Newest"
-
-        if search_text:
-            expenses = [
-                expense
-                for expense in expenses
-                if search_text in expense.merchant.lower() or search_text in expense.notes.lower()
-            ]
-
-        if payment_method != "All Methods":
-            expenses = [expense for expense in expenses if expense.payment_method == payment_method]
-
-        if self.start_date_filter:
-            expenses = [
-                expense
-                for expense in expenses
-                if expense.expense_date >= self.start_date_filter
-            ]
-
-        if self.end_date_filter:
-            expenses = [
-                expense
-                for expense in expenses
-                if expense.expense_date <= self.end_date_filter
-            ]
-
-        if sort_option == "Oldest":
-            expenses.sort(key=lambda expense: (expense.expense_date, expense.id or 0))
-        elif sort_option == "Amount High-Low":
-            expenses.sort(key=lambda expense: (-expense.amount, expense.expense_date), reverse=False)
-        elif sort_option == "Amount Low-High":
-            expenses.sort(key=lambda expense: (expense.amount, expense.expense_date))
-        elif sort_option == "Merchant A-Z":
-            expenses.sort(key=lambda expense: (expense.merchant.lower(), expense.expense_date), reverse=False)
-        else:
-            expenses.sort(key=lambda expense: (expense.expense_date, expense.id or 0), reverse=True)
-
-        return expenses
+        self.status_color = [0.98, 0.82, 0.78, 1] if is_error else [0.84, 0.93, 0.89, 1]
 
     def open_visualization(self) -> None:
         visualization_screen = self.manager.get_screen("visualization")
@@ -1892,7 +1893,9 @@ class ExpenseListScreen(Screen):
             imported += 1
 
         popup.dismiss()
-        self.refresh_expenses()
+        self.refresh_dashboard()
+        transactions_screen = self.manager.get_screen("transactions")
+        transactions_screen.refresh_expenses()
         self.show_saved_status(f"Imported {imported} transaction(s) from CSV.")
         self._set_transfer_status(
             f"Imported {imported} row(s). Skipped {len(result.invalid_rows)} invalid rows.",
@@ -1928,6 +1931,208 @@ class ExpenseListScreen(Screen):
         if fallback:
             return fallback
         return "transactions.csv"
+
+    def _refresh_empty_card(self, instance: BoxLayout) -> None:
+        from kivy.graphics import Color, RoundedRectangle
+
+        instance.canvas.before.clear()
+        with instance.canvas.before:
+            Color(1, 1, 1, 1)
+            RoundedRectangle(pos=instance.pos, size=instance.size, radius=[24, 24, 24, 24])
+
+class TransactionsScreen(Screen):
+    repository = ObjectProperty(allownone=False)
+    status_message = StringProperty("Review saved transactions and keep the ledger clean.")
+    status_color = ListProperty([0.84, 0.93, 0.89, 1])
+    start_date_filter = StringProperty("")
+    end_date_filter = StringProperty("")
+    start_date_filter_text = StringProperty("Start Date")
+    end_date_filter_text = StringProperty("End Date")
+
+    def on_pre_enter(self, *args) -> None:
+        self.refresh_expenses()
+        return super().on_pre_enter(*args)
+
+    def refresh_expenses(self) -> None:
+        container = self.ids.list_container
+        container.clear_widgets()
+        expenses = self._get_visible_expenses()
+
+        if not expenses:
+            empty_label = Label(
+                text="No matching transactions yet.",
+                halign="center",
+                valign="middle",
+                color=(0.28, 0.32, 0.3, 1),
+            )
+            empty_label.bind(size=lambda instance, _value: setattr(instance, "text_size", (instance.width - 24, None)))
+            container.add_widget(BoxLayout(size_hint_y=None, height=180))
+            empty_state = container.children[0]
+            empty_state.padding = 18
+            empty_state.bind(
+                pos=lambda instance, _value: self._refresh_empty_card(instance),
+                size=lambda instance, _value: self._refresh_empty_card(instance),
+            )
+            self._refresh_empty_card(empty_state)
+            empty_state.add_widget(empty_label)
+            return
+
+        for expense in expenses:
+            container.add_widget(
+                ExpenseRow(
+                    expense_id=expense.id or 0,
+                    merchant_text=expense.merchant,
+                    note_text=expense.notes,
+                    amount_text=f"Rs. {expense.amount:.2f}",
+                    date_text=expense.expense_date,
+                    method_text=expense.payment_method,
+                    list_screen=self,
+                )
+            )
+
+    def clear_filters(self) -> None:
+        self.start_date_filter = ""
+        self.end_date_filter = ""
+        self.start_date_filter_text = "Start Date"
+        self.end_date_filter_text = "End Date"
+        self.ids.search_input.text = ""
+        self.ids.payment_filter_input.text = "All Methods"
+        self.ids.sort_input.text = "Newest"
+        self.refresh_expenses()
+
+    def open_start_date_picker(self) -> None:
+        popup = DatePickerPopup(
+            selected_date=self._selected_filter_date(self.start_date_filter),
+            on_select=self._set_start_date_filter,
+        )
+        popup.open()
+
+    def open_end_date_picker(self) -> None:
+        popup = DatePickerPopup(
+            selected_date=self._selected_filter_date(self.end_date_filter),
+            on_select=self._set_end_date_filter,
+        )
+        popup.open()
+
+    def _set_start_date_filter(self, selected: date) -> None:
+        self.start_date_filter = selected.isoformat()
+        self.start_date_filter_text = self.start_date_filter
+        if self.end_date_filter and self.start_date_filter > self.end_date_filter:
+            self.end_date_filter = ""
+            self.end_date_filter_text = "End Date"
+            self._set_status("Start date updated. Choose an end date to complete the range.", is_error=False)
+        self.refresh_expenses()
+
+    def _set_end_date_filter(self, selected: date) -> None:
+        self.end_date_filter = selected.isoformat()
+        self.end_date_filter_text = self.end_date_filter
+        if self.start_date_filter and self.end_date_filter < self.start_date_filter:
+            self.start_date_filter = ""
+            self.start_date_filter_text = "Start Date"
+            self._set_status("End date updated. Choose a start date to complete the range.", is_error=False)
+        self.refresh_expenses()
+
+    def _selected_filter_date(self, raw_value: str) -> date:
+        try:
+            return date.fromisoformat(raw_value) if raw_value else date.today()
+        except ValueError:
+            return date.today()
+
+    def edit_expense(self, expense_id: int | None) -> None:
+        if expense_id is None:
+            self._set_status("Unable to open this transaction.", is_error=True)
+            return
+
+        edit_screen = self.manager.get_screen("edit")
+        edit_screen.load_expense(expense_id)
+        self.manager.current = "edit"
+
+    def view_expense(self, expense_id: int | None) -> None:
+        if expense_id is None:
+            self._set_status("Unable to open this transaction.", is_error=True)
+            return
+
+        expense = self.repository.get_expense(expense_id)
+        if expense is None:
+            self._set_status("Transaction not found.", is_error=True)
+            self.refresh_expenses()
+            return
+
+        self._open_expense_detail_popup(expense)
+
+    def show_saved_status(self, message: str) -> None:
+        self._set_status(message, is_error=False)
+
+    def confirm_delete(self, expense_id: int | None) -> None:
+        if expense_id is None:
+            self._set_status("Unable to delete this transaction.", is_error=True)
+            return
+
+        expense = self.repository.get_expense(expense_id)
+        if expense is None:
+            self._set_status("Transaction not found.", is_error=True)
+            self.refresh_expenses()
+            return
+
+        content = BoxLayout(orientation="vertical", spacing=12, padding=16)
+        content.add_widget(Label(text="Are you sure you want to delete this transaction?", halign="center", valign="middle", color=(0.15, 0.18, 0.16, 1)))
+        buttons = BoxLayout(size_hint_y=None, height=58, spacing=10)
+        popup = Popup(title="Delete Transaction", content=content, size_hint=(0.85, None), height=238, auto_dismiss=False)
+        no_button = Button(text="No", background_normal="", background_color=(0.4, 0.45, 0.43, 1), size_hint_y=None, height=58)
+        yes_button = Button(text="Yes", background_normal="", background_color=(0.68, 0.24, 0.2, 1), size_hint_y=None, height=58)
+        no_button.bind(on_release=lambda _instance: popup.dismiss())
+        yes_button.bind(on_release=lambda _instance: self._delete_expense(expense, popup))
+        buttons.add_widget(no_button)
+        buttons.add_widget(yes_button)
+        content.add_widget(buttons)
+        popup.open()
+
+    def _delete_expense(self, expense: ExpenseRecord, popup: Popup) -> None:
+        self.repository.delete_expense(expense.id or 0)
+        popup.dismiss()
+        self.show_saved_status(f"Deleted Rs. {expense.amount:.2f} for {expense.merchant}.")
+        self.refresh_expenses()
+        home_screen = self.manager.get_screen("home")
+        home_screen.refresh_dashboard()
+
+    def _set_status(self, message: str, *, is_error: bool) -> None:
+        self.status_message = message
+        self.status_color = [0.98, 0.82, 0.78, 1] if is_error else [0.84, 0.93, 0.89, 1]
+
+    def _get_visible_expenses(self) -> list[ExpenseRecord]:
+        expenses = self.repository.list_expenses(limit=None)
+        search_text = self.ids.search_input.text.strip().lower() if "search_input" in self.ids else ""
+        payment_method = self.ids.payment_filter_input.text if "payment_filter_input" in self.ids else "All Methods"
+        sort_option = self.ids.sort_input.text if "sort_input" in self.ids else "Newest"
+
+        if search_text:
+            expenses = [
+                expense
+                for expense in expenses
+                if search_text in expense.merchant.lower() or search_text in expense.notes.lower()
+            ]
+
+        if payment_method != "All Methods":
+            expenses = [expense for expense in expenses if expense.payment_method == payment_method]
+
+        if self.start_date_filter:
+            expenses = [expense for expense in expenses if expense.expense_date >= self.start_date_filter]
+
+        if self.end_date_filter:
+            expenses = [expense for expense in expenses if expense.expense_date <= self.end_date_filter]
+
+        if sort_option == "Oldest":
+            expenses.sort(key=lambda expense: (expense.expense_date, expense.id or 0))
+        elif sort_option == "Amount High-Low":
+            expenses.sort(key=lambda expense: (-expense.amount, expense.expense_date), reverse=False)
+        elif sort_option == "Amount Low-High":
+            expenses.sort(key=lambda expense: (expense.amount, expense.expense_date))
+        elif sort_option == "Merchant A-Z":
+            expenses.sort(key=lambda expense: (expense.merchant.lower(), expense.expense_date), reverse=False)
+        else:
+            expenses.sort(key=lambda expense: (expense.expense_date, expense.id or 0), reverse=True)
+
+        return expenses
 
     def _refresh_empty_card(self, instance: BoxLayout) -> None:
         from kivy.graphics import Color, RoundedRectangle
@@ -2340,9 +2545,11 @@ class NotificationsScreen(Screen):
 
         self._set_status(f"Saved {saved} debit transaction(s) from statements.", is_error=False)
         self.refresh_reviews()
-        home_screen = self.manager.get_screen("list")
+        home_screen = self.manager.get_screen("home")
+        transactions_screen = self.manager.get_screen("transactions")
         home_screen.show_saved_status(f"Saved {saved} statement transaction(s) to the main list.")
-        home_screen.refresh_expenses()
+        home_screen.refresh_dashboard()
+        transactions_screen.refresh_expenses()
 
     def clear_pending_reviews(self) -> None:
         cleared = self.repository.clear_statement_reviews(status="pending")
@@ -2683,9 +2890,11 @@ class NotificationsScreen(Screen):
         saved_expense = self.repository.confirm_statement_review(review)
         self._set_status(f"Saved Rs. {saved_expense.amount:.2f} from statements.", is_error=False)
         self.refresh_reviews()
-        home_screen = self.manager.get_screen("list")
+        home_screen = self.manager.get_screen("home")
+        transactions_screen = self.manager.get_screen("transactions")
         home_screen.show_saved_status(f"Saved Rs. {saved_expense.amount:.2f} for {saved_expense.merchant}.")
-        home_screen.refresh_expenses()
+        home_screen.refresh_dashboard()
+        transactions_screen.refresh_expenses()
 
     def reject_review(self, review_id: int) -> None:
         self.repository.reject_statement_review(review_id)
@@ -2835,7 +3044,7 @@ class VisualizationScreen(Screen):
             self.refresh_chart()
 
     def go_back(self) -> None:
-        self.manager.current = "list"
+        self.manager.current = "home"
 
     def refresh_chart(self) -> None:
         chart_anchor = self.ids.chart_anchor
@@ -3073,13 +3282,16 @@ class ExpenseEditScreen(Screen):
             saved_expense = self.repository.update_expense(expense)
             status_message = f"Updated Rs. {saved_expense.amount:.2f} for {saved_expense.merchant}."
 
-        list_screen = self.manager.get_screen("list")
-        list_screen.show_saved_status(status_message)
-        list_screen.refresh_expenses()
-        self.manager.current = "list"
+        home_screen = self.manager.get_screen("home")
+        transactions_screen = self.manager.get_screen("transactions")
+        home_screen.show_saved_status(status_message)
+        home_screen.refresh_dashboard()
+        transactions_screen.show_saved_status(status_message)
+        transactions_screen.refresh_expenses()
+        self.manager.current = "transactions"
 
     def cancel(self) -> None:
-        self.manager.current = "list"
+        self.manager.current = "transactions"
 
     def open_date_picker(self) -> None:
         selected_date = date.fromisoformat(self.ids.date_button.text)
@@ -3118,10 +3330,11 @@ class ExpenseTrackerApp(App):
             repository = self._create_repository()
             root = ExpenseRoot(repository=repository)
             root.add_widget(ExpenseListScreen(repository=repository))
+            root.add_widget(TransactionsScreen(repository=repository))
             root.add_widget(NotificationsScreen(repository=repository))
             root.add_widget(ExpenseEditScreen(repository=repository))
             root.add_widget(VisualizationScreen(repository=repository))
-            root.current = "list"
+            root.current = "home"
             return root
         except Exception:
             error_text = traceback.format_exc()
